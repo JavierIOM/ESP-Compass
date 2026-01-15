@@ -622,3 +622,5 @@ This project is open source. Feel free to modify, distribute, and use for any pu
 **Project by Javier**
 
 Built with ESP32 and Adafruit LSM303AGR sensor | January 2025
+
+**GitHub Repository:** https://github.com/JavierIOM/ESP-Compass
