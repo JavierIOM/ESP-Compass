@@ -1,5 +1,7 @@
 # ESP32 Digital Compass
 
+**Version 0.0.1** (Pre-release - untested on hardware)
+
 A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
 ## Features
@@ -36,7 +38,6 @@ All parts available from **The Pi Hut** (UK):
 - **Compact Design:** Smaller than standard ESP32 DevKit boards
 - **Quality Components:** DFRobot quality, more reliable than generic clones
 - **I2C Ready:** GPIO21 (SDA) and GPIO22 (SCL) match our code perfectly
-- **Proven:** I2C and GPIO functions fully working in Arduino IDE
 
 ### About the Cable
 
@@ -88,61 +89,27 @@ The LSM303AGR connects to the FireBeetle ESP32 using the STEMMA QT cable:
 
 ## Software Requirements
 
-### Arduino IDE Setup (Windows)
+### PlatformIO Setup (Recommended)
 
-#### 1. Install Arduino IDE
-- Download Arduino IDE 2.x from: https://www.arduino.cc/en/software
-- Choose "Windows Win 10 and newer, 64 bits"
-- Run the installer
-- Installation time: ~5 minutes
+This project uses PlatformIO for building and uploading.
 
-#### 2. Add ESP32 Board Support
-- Open Arduino IDE
-- Go to **File → Preferences**
-- In "Additional Board Manager URLs", add:
-  ```
-  https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-  ```
-- Click **OK**
-- Go to **Tools → Board → Boards Manager**
-- Search for **"esp32"**
-- Install **"esp32 by Espressif Systems"** (latest version)
-- Wait for download/install (~5-10 minutes)
+#### 1. Install VS Code and PlatformIO
 
-#### 3. Install Required Libraries
+1. Download and install [VS Code](https://code.visualstudio.com/)
+2. Open VS Code
+3. Go to Extensions (Ctrl+Shift+X)
+4. Search for "PlatformIO IDE"
+5. Install the PlatformIO IDE extension
+6. Restart VS Code when prompted
 
-Open **Tools → Manage Libraries** and install each of these:
+#### 2. Open the Project
 
-**From Library Manager:**
-- `Adafruit LSM303 Accel` by Adafruit
-- `Adafruit LSM303AGR Mag` by Adafruit
-- `Adafruit Unified Sensor` by Adafruit (auto-installed as dependency)
+1. Open VS Code
+2. Click "Open Folder" and select this project folder
+3. PlatformIO will automatically detect `platformio.ini` and configure the project
+4. Wait for PlatformIO to download required libraries (first time only)
 
-**Manual Installation Required:**
-
-ESPAsyncWebServer and AsyncTCP need manual installation:
-
-1. Download these ZIP files:
-   - AsyncTCP: https://github.com/me-no-dev/AsyncTCP/archive/master.zip
-   - ESPAsyncWebServer: https://github.com/me-no-dev/ESPAsyncWebServer/archive/master.zip
-
-2. In Arduino IDE:
-   - Go to **Sketch → Include Library → Add .ZIP Library**
-   - Select the downloaded AsyncTCP ZIP file
-   - Repeat for ESPAsyncWebServer ZIP file
-
-#### 4. Install ESP32 Filesystem Uploader
-
-This tool uploads the web interface to the ESP32's SPIFFS filesystem:
-
-1. Download from: https://github.com/me-no-dev/arduino-esp32fs-plugin/releases
-2. Extract the contents
-3. Copy to: `C:\Users\[YourUsername]\Documents\Arduino\tools\`
-   - Create the `tools` folder if it doesn't exist
-4. Restart Arduino IDE
-5. Verify: **Tools** menu should now have "ESP32 Sketch Data Upload"
-
-#### 5. USB Drivers (Usually Automatic)
+#### 3. USB Drivers (Usually Automatic)
 
 Windows 10/11 usually installs drivers automatically when you plug in the FireBeetle.
 
@@ -150,52 +117,64 @@ If the board isn't recognized:
 - **CP2102 Driver:** https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers
 - **CH340 Driver:** https://sparks.gogo.co.nz/ch340.html
 
-**Total setup time: 15-20 minutes**
+## Project Structure
+
+```
+ESP-Compass/
+├── platformio.ini          # PlatformIO configuration
+├── src/
+│   └── main.cpp            # Main application code
+├── data/
+│   └── index.html          # Web interface (uploaded to SPIFFS)
+└── README.md
+```
 
 ## Installation
 
 ### 1. Configure Access Point (Optional)
 
-The ESP32 creates its own WiFi network. You can customize the name and password by editing `ESP32-Compass.ino` lines 11-12:
+The ESP32 creates its own WiFi network. You can customize the name and password by editing `src/main.cpp` lines 12-13:
 
 ```cpp
 const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
 const char* ap_password = "compass123";     // Password (min 8 chars, or "" for open network)
 ```
 
-**Default settings work great for most users!** The ESP32 will broadcast "ESP32-Compass" as its network name.
+**Default settings work great for most users!**
 
-### 2. Select Board and Port
+### 2. Build the Project
 
-- Connect FireBeetle ESP32 via USB
-- Go to **Tools → Board → esp32**
-- Select **"FireBeetle-ESP32"** (or "ESP32 Dev Module" if not listed)
-- Go to **Tools → Port**
-- Select the COM port that appeared when you plugged in the board
-  - Usually COM3, COM4, COM5, etc.
-  - Windows should show "USB-SERIAL CH340" or "Silicon Labs CP210x"
+In VS Code with PlatformIO:
 
-### 3. Upload the Web Interface
+1. Click the PlatformIO icon in the sidebar (alien head icon)
+2. Under "Project Tasks" → "firebeetle32":
+   - Click **Build** to compile the project
 
-This step uploads the HTML/CSS/JS files to the ESP32's filesystem:
+Or use the keyboard shortcut: `Ctrl+Alt+B`
 
-- In Arduino IDE, go to **Tools → ESP32 Sketch Data Upload**
-- Wait for upload to complete (~30 seconds)
-- You should see "SPIFFS Image Uploaded" in the console
+### 3. Upload the Web Interface (SPIFFS)
 
-**Important:** Do this BEFORE uploading the sketch!
+The web files must be uploaded separately to the ESP32's filesystem:
 
-### 4. Upload the Arduino Sketch
+1. Connect the FireBeetle ESP32 via USB
+2. In PlatformIO sidebar, click **Upload Filesystem Image**
+   - This uploads everything in the `data/` folder to SPIFFS
 
-- Click the **Upload** button (→ arrow icon)
-- Wait for compilation and upload (~1-2 minutes)
-- Console will show "Leaving... Hard resetting via RTS pin..."
+**Important:** Do this BEFORE or AFTER uploading the main firmware - both are required!
+
+### 4. Upload the Firmware
+
+1. In PlatformIO sidebar, click **Upload**
+2. Wait for compilation and upload to complete
+3. The serial monitor will show upload progress
+
+Or use the keyboard shortcut: `Ctrl+Alt+U`
 
 ### 5. Connect to the Compass
 
 After uploading, the ESP32 creates its own WiFi network:
 
-1. Open **Tools → Serial Monitor** and set baud rate to **115200**
+1. Open Serial Monitor (PlatformIO sidebar → Monitor, or `Ctrl+Alt+S`)
 2. Press the **RST** button on the ESP32
 3. You'll see:
    ```
@@ -222,8 +201,6 @@ After uploading, the ESP32 creates its own WiFi network:
 
 The compass interface will load immediately!
 
-**Bookmark the page and you'll only need to connect to the WiFi network in future.**
-
 ## Usage
 
 ### First Use
@@ -231,7 +208,7 @@ The compass interface will load immediately!
 1. Power on the ESP32 (via USB or battery)
 2. Wait ~5 seconds for the Access Point to start
 3. Connect your device to the **ESP32-Compass** WiFi network
-4. Open your browser to **http://192.168.4.1** (or use your bookmark)
+4. Open your browser to **http://192.168.4.1**
 5. The compass needle should start moving immediately
 6. Rotate the sensor to test - the needle follows magnetic north
 
@@ -250,25 +227,15 @@ The compass may need calibration for accurate readings in your location.
    - Tilt up and down
    - Roll side to side
    - Figure-8 pattern works well
-4. Note the min/max values for each axis:
-   ```
-   X: min = -45.2, max = 52.3
-   Y: min = -38.7, max = 41.2
-   Z: min = -62.1, max = 58.9
-   ```
-5. Calculate offsets:
-   ```
-   magOffsetX = (-45.2 + 52.3) / 2 = 3.55
-   magOffsetY = (-38.7 + 41.2) / 2 = 1.25
-   magOffsetZ = (-62.1 + 58.9) / 2 = -1.6
-   ```
-6. Update the sketch (lines 29-31):
+4. Note the min/max values for each axis
+5. Calculate offsets: `offset = (min + max) / 2`
+6. Update `src/main.cpp` (lines 28-30):
    ```cpp
-   float magOffsetX = 3.55;
-   float magOffsetY = 1.25;
-   float magOffsetZ = -1.6;
+   float magOffsetX = <your_x_offset>;
+   float magOffsetY = <your_y_offset>;
+   float magOffsetZ = <your_z_offset>;
    ```
-7. Re-upload the sketch
+7. Rebuild and re-upload the firmware
 
 ### Tips for Best Results
 
@@ -280,7 +247,6 @@ The compass may need calibration for accurate readings in your location.
   - Phones/laptops
   - Power supplies
 - **Stable mounting:** Secure the sensor to avoid vibration
-- **Update rate:** 10Hz refresh (100ms) - smooth and responsive
 
 ### Battery Operation
 
@@ -289,7 +255,6 @@ The FireBeetle ESP32 has excellent battery support:
 - **LiPo Connector:** JST 2.0mm connector on board
 - **Charging:** Onboard LiPo charging via USB
 - **Battery Life:** 8-12 hours typical with 1000mAh battery
-- **Low Power:** FireBeetle's optimized for battery operation
 
 ## Web Interface Features
 
@@ -297,7 +262,6 @@ The FireBeetle ESP32 has excellent battery support:
 - **Animated compass rose** with 60 degree marks
 - **Cardinal directions** (N, E, S, W) highlighted in red
 - **Red needle** points to magnetic north
-- **Gray needle** shows south (opposite direction)
 - **Smooth rotation** with CSS transitions
 - **Responsive design** - works on phone, tablet, desktop
 
@@ -310,13 +274,10 @@ The FireBeetle ESP32 has excellent battery support:
 ### Theme Toggle
 - **Dark mode** (default) - easy on the eyes
 - **Light mode** - for bright environments
-- **Saved preference** - browser remembers your choice
-- **Smooth transition** - animated color changes
 
 ### Connection Status
 - **Green pulsing dot** - Connected to ESP32
-- **Red pulsing dot** - Disconnected (auto-reconnects every 3 seconds)
-- **Status text** - Shows connection state
+- **Red pulsing dot** - Disconnected (auto-reconnects)
 
 ## Troubleshooting
 
@@ -326,65 +287,27 @@ The FireBeetle ESP32 has excellent battery support:
 - Check all 4 wire connections (GND, VIN, SDA, SCL)
 - Verify sensor power - look for a small LED on the sensor board
 - Ensure cable is fully inserted into STEMMA QT port
-- Try the other STEMMA QT port on the sensor (both are identical)
-- Check continuity with a multimeter if available
-
-**Sensor Found But Readings Are All Zeros**
-- The sensor is powered but not communicating
-- Try swapping SDA and SCL wires
-- Check for loose connections
-- Press the RST button on the ESP32
+- Try the other STEMMA QT port on the sensor
 
 **Compass Points Wrong Direction**
 - Perform calibration procedure (see Usage section)
 - Check for magnetic interference nearby
-- Ensure sensor orientation is consistent
-- Remember: compass shows magnetic north, not true north
 
 ### Software Issues
 
 **Can't See ESP32-Compass WiFi Network**
-- Wait 10 seconds after powering on - AP takes a few seconds to start
+- Wait 10 seconds after powering on
 - Check Serial Monitor - does it say "Access Point Started!"?
-- Ensure ESP32 is powered (check for LED on board)
-- Try pressing the RST button on the ESP32
-- Move closer to the ESP32 (AP range is ~10-20m)
-- Check your device's WiFi settings are enabled
-- Some devices hide networks with weak signal - move closer
+- Press the RST button on the ESP32
 
 **Web Page Won't Load**
-- Ensure you're connected to the **ESP32-Compass** WiFi network first!
+- Ensure you're connected to the **ESP32-Compass** WiFi network
 - Try the default IP: **http://192.168.4.1**
-- Check Serial Monitor for the correct IP address
-- Verify SPIFFS upload was successful (step 3 of installation)
-- Try a different browser
-- Clear browser cache
-- Some devices need "Stay connected" confirmation when joining network without internet
+- Verify SPIFFS upload was successful
 
 **Page Loads But Shows "Disconnected"**
-- The HTML loaded but WebSocket connection failed
 - Check Serial Monitor - is the ESP32 still running?
-- Try refreshing the page (F5)
-- Check browser console (F12) for JavaScript errors
-- Ensure you're still connected to the ESP32-Compass network
-
-**WebSocket Connection Keeps Dropping**
-- Move your device closer to the ESP32
-- Check WiFi signal strength on your device
-- Reduce update frequency in code (saves power and bandwidth):
-  ```cpp
-  const unsigned long updateInterval = 200; // Change from 100 to 200ms
-  ```
-- Check for interference (other WiFi networks, microwaves, metal objects)
-- Try rebooting the ESP32
-
-**Compass Needle Jerky/Stuttering**
-- Normal near metal objects or magnetic sources
-- Try calibration
-- Increase CSS transition time in `data/index.html`:
-  ```css
-  transition: transform 0.5s ease-out; /* Change from 0.3s */
-  ```
+- Try refreshing the page
 
 ### Upload Issues
 
@@ -392,13 +315,6 @@ The FireBeetle ESP32 has excellent battery support:
 - Check USB cable (some are power-only, need data cable)
 - Try a different USB port
 - Press and hold BOOT button while uploading
-- Install/update USB drivers (see Software Requirements section)
-- Check Device Manager - is the COM port visible?
-
-**"A fatal error occurred: Timed out waiting for packet header"**
-- Press RST button, then immediately try upload again
-- Try holding BOOT button during upload
-- Reduce upload speed: Tools → Upload Speed → 115200
 
 ## Technical Details
 
@@ -407,12 +323,7 @@ The FireBeetle ESP32 has excellent battery support:
 **FireBeetle ESP32:**
 - Microcontroller: ESP-WROOM-32 (Dual-core Xtensa LX6)
 - Clock Speed: Up to 240MHz
-- Flash: 16MB
-- SRAM: 520KB
 - WiFi: 802.11 b/g/n (2.4GHz)
-- Bluetooth: Bluetooth 4.2 + BLE
-- GPIO: 10 digital pins, 5 analog pins (ADC)
-- Interfaces: I2C, SPI, UART
 - Power: Ultra-low consumption design, LiPo charging circuit
 
 **Adafruit LSM303AGR:**
@@ -420,28 +331,9 @@ The FireBeetle ESP32 has excellent battery support:
 - Magnetometer Range: ±50 gauss
 - Resolution: 16-bit
 - I2C Addresses: 0x19 (accelerometer), 0x1E (magnetometer)
-- Update Rate: Up to 400Hz (we use 10Hz)
-- Power: ~0.5mA active
 
-### Software Architecture
+### Communication Protocol
 
-**Compass Calculation Algorithm:**
-1. Read accelerometer (X, Y, Z) for tilt/orientation
-2. Read magnetometer (X, Y, Z) for magnetic field
-3. Normalize accelerometer vector
-4. Calculate pitch: `pitch = asin(-ax)`
-5. Calculate roll: `roll = asin(ay / cos(pitch))`
-6. Apply tilt compensation to magnetometer:
-   ```cpp
-   mag_x_comp = mx * cos(pitch) + mz * sin(pitch)
-   mag_y_comp = mx * sin(roll) * sin(pitch) + my * cos(roll) - mz * sin(roll) * cos(pitch)
-   ```
-7. Calculate heading: `heading = atan2(mag_y_comp, mag_x_comp)`
-8. Convert to degrees: `heading_degrees = heading * 180 / PI`
-9. Normalize to 0-360°
-
-**Communication Protocol:**
-- I2C bus @ 100kHz (default speed)
 - WebSocket connection on port 80
 - JSON data format:
   ```json
@@ -455,36 +347,11 @@ The FireBeetle ESP32 has excellent battery support:
   ```
 - Update frequency: 10Hz (100ms intervals)
 
-**Web Server:**
-- ESPAsyncWebServer (non-blocking)
-- AsyncWebSocket for real-time data
-- SPIFFS filesystem for HTML/CSS/JS
-- Serves index.html as default page
-- Auto-reconnection logic on client side
-
-### Power Consumption
-
-**Typical Current Draw:**
-- ESP32 WiFi active: ~80mA
-- LSM303AGR sensor: ~0.5mA
-- **Total: ~80-100mA**
-
-**Battery Life Estimates (with LiPo):**
-- 500mAh battery: ~5-6 hours
-- 1000mAh battery: ~10-12 hours
-- 2000mAh battery: ~20-24 hours
-
-**Power Optimization Options:**
-- Reduce WiFi transmit power in code
-- Increase update interval (less frequent reads)
-- Use ESP32 light sleep between updates
-- FireBeetle's power management chip already optimized
-
 ## Customization
 
 ### Change Update Rate
 
-In `ESP32-Compass.ino`, line 24:
+In `src/main.cpp`, line 25:
 ```cpp
 const unsigned long updateInterval = 100; // milliseconds
 
@@ -492,106 +359,33 @@ const unsigned long updateInterval = 100; // milliseconds
 // 50ms = 20Hz (very smooth, more power)
 // 100ms = 10Hz (current setting, balanced)
 // 200ms = 5Hz (slower, saves power)
-// 500ms = 2Hz (very slow, maximum battery life)
 ```
 
 ### Modify Compass Appearance
 
-Edit `data/index.html` CSS variables (lines 15-25):
-
-```css
-:root {
-    --bg-primary: #0f172a;      /* Main background color */
-    --bg-secondary: #1e293b;    /* Panel background */
-    --text-primary: #f1f5f9;    /* Main text color */
-    --accent: #ef4444;          /* Needle and highlight color */
-    --success: #10b981;         /* Connection indicator */
-    /* Change these hex colors to customize! */
-}
-```
-
-**Color Suggestions:**
-- Blue theme: `--accent: #3b82f6;`
-- Green theme: `--accent: #10b981;`
-- Purple theme: `--accent: #a855f7;`
-- Orange theme: `--accent: #f97316;`
-
-### Change Compass Size
-
-In `data/index.html`, line 114:
-```css
-.compass-container {
-    width: min(400px, 90vw);  /* Change 400px to larger/smaller */
-    height: min(400px, 90vw);
-}
-```
-
-### Add Additional Data Fields
-
-In `ESP32-Compass.ino`, around line 70, add to the JSON:
-```cpp
-String json = "{";
-json += "\"heading\":" + String(heading, 1) + ",";
-json += "\"direction\":\"" + direction + "\",";
-json += "\"mag_x\":" + String(mag_x, 2) + ",";
-json += "\"mag_y\":" + String(mag_y, 2) + ",";
-json += "\"mag_z\":" + String(mag_z, 2) + ",";
-json += "\"temperature\":" + String(temperature, 1); // Add custom field
-json += "}";
-```
-
-Then update `data/index.html` to display it.
-
-## Demo Mode
-
-Want to see the interface without hardware?
-
-Open `demo.html` in your browser - it simulates a working compass with animated rotation and realistic magnetometer readings.
-
-Perfect for:
-- Testing the interface design
-- Showing off the project
-- Development/customization
-- Screenshots
+Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
 
-- **v1.0** (January 2025)
-  - Initial release
+- **v0.0.1** (January 2025)
+  - Initial PlatformIO setup
+  - Migrated from Arduino IDE to PlatformIO
   - Tilt-compensated heading calculation
   - WebSocket real-time updates
   - Dark/Light mode interface
   - FireBeetle ESP32 support
   - STEMMA QT connector support
-  - Demo mode
+  - **Note:** Untested on hardware
 
-## Future Enhancements
+## Dependencies
 
-Possible additions:
-- GPS integration for true north calculation
-- Data logging to SD card
-- Historical heading graph
-- Calibration wizard in web interface
-- Mobile app (PWA support)
-- MQTT publishing for home automation
-- Multiple sensor support
-- Pitch/roll display
+Managed automatically by PlatformIO (see `platformio.ini`):
 
-## Support & Resources
-
-**For Hardware Issues:**
-- Adafruit LSM303AGR: https://learn.adafruit.com/lsm303-accelerometer-slash-compass-breakout
-- DFRobot FireBeetle: https://wiki.dfrobot.com/FireBeetle_ESP32_IOT_Microcontroller
-
-**For ESP32 Questions:**
-- ESP32 Arduino Core: https://github.com/espressif/arduino-esp32
-- Espressif Documentation: https://docs.espressif.com/projects/esp-idf/
-
-**For This Project:**
-- Check the troubleshooting section above
-- Review the wiring diagram
-- Verify all software libraries are installed
-- Check Serial Monitor output for error messages
+- Adafruit Unified Sensor
+- Adafruit LSM303 Accel
+- Adafruit LIS2MDL
+- AsyncTCP (me-no-dev)
+- ESPAsyncWebServer (me-no-dev)
 
 ## License
 
@@ -606,21 +400,10 @@ This project is open source. Feel free to modify, distribute, and use for any pu
 - Breakout board by Adafruit Industries
 
 **Software Libraries:**
-- Adafruit Sensor Library
-- Adafruit LSM303 Libraries
+- Adafruit Sensor Libraries
 - ESPAsyncWebServer by me-no-dev
 - AsyncTCP by me-no-dev
 
-**Built with:**
-- Arduino IDE
-- HTML5, CSS3, JavaScript
-- WebSocket API
-- ESP32 Arduino Core
-
 ---
 
-**Project by Javier**
-
 Built with ESP32 and Adafruit LSM303AGR sensor | January 2025
-
-**GitHub Repository:** https://github.com/JavierIOM/ESP-Compass
