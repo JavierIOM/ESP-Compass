@@ -4,7 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM303_Accel.h>
-#include <Adafruit_LSM303AGR_Mag.h>
+#include <Adafruit_LIS2MDL.h>
 #include <SPIFFS.h>
 
 // Access Point credentials - CHANGE THESE IF DESIRED
@@ -13,7 +13,7 @@ const char* ap_password = "compass123";     // Password (min 8 chars, or "" for 
 
 // Create sensor objects
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
-Adafruit_LSM303AGR_Mag_Unified mag = Adafruit_LSM303AGR_Mag_Unified(12345);
+Adafruit_LIS2MDL mag = Adafruit_LIS2MDL(12345);
 
 // Web server on port 80
 AsyncWebServer server(80);
