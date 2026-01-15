@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Digital Compass - DEMO MODE</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23ef4444'/%3E%3Cpolygon points='50,15 55,45 50,50 45,45' fill='white'/%3E%3Cpolygon points='50,85 55,55 50,50 45,55' fill='white' opacity='0.6'/%3E%3C/svg%3E">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #ef4444;
+            --accent-glow: rgba(239, 68, 68, 0.3);
+            --border: #475569;
+            --success: #10b981;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --accent: #ef4444;
+            --accent-glow: rgba(239, 68, 68, 0.2);
+            --border: #cbd5e1;
+            --success: #059669;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .demo-badge {
+            background: #3b82f6;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        .compass-container {
+            position: relative;
+            width: min(400px, 90vw);
+            height: min(400px, 90vw);
+        }
+
+        .compass-outer {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-secondary);
+            border-radius: 50%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .compass-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+        }
+
+        .compass-marks {
+            display: none;
+        }
+
+        .compass-degree {
+            position: absolute;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            transform: translate(-50%, -50%);
+        }
+
+        .compass-cardinal {
+            position: absolute;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--accent);
+            transform: translate(-50%, -50%);
+        }
+
+        .cardinal-n { top: 8%; left: 50%; }
+        .cardinal-e { top: 50%; right: 8%; transform: translate(50%, -50%); }
+        .cardinal-s { bottom: 8%; left: 50%; transform: translate(-50%, 50%); }
+        .cardinal-w { top: 50%; left: 8%; transform: translate(-50%, -50%); }
+
+        .compass-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transform-origin: center center;
+            transition: transform 0.3s ease-out;
+        }
+
+        .needle-north {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 140px solid var(--accent);
+            position: absolute;
+            top: -140px;
+            left: -8px;
+            filter: drop-shadow(0 0 10px var(--accent-glow));
+        }
+
+        .needle-south {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 140px solid var(--text-secondary);
+            position: absolute;
+            top: 0;
+            left: -8px;
+            opacity: 0.6;
+        }
+
+        .compass-center {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px var(--accent-glow);
+            z-index: 10;
+        }
+
+        .data-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 2rem;
+            min-width: min(400px, 90vw);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-row:last-child {
+            border-bottom: none;
+        }
+
+        .data-label {
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .data-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .heading-display {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .mag-data {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .mag-axis {
+            text-align: center;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 0.5rem;
+        }
+
+        .mag-axis-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .mag-axis-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 1rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .compass-container {
+                width: min(300px, 90vw);
+                height: min(300px, 90vw);
+            }
+
+            .compass-mark {
+                transform-origin: 50% 150px;
+            }
+
+            .needle-north {
+                border-bottom-width: 100px;
+                top: -100px;
+            }
+
+            .needle-south {
+                border-top-width: 100px;
+                bottom: -100px;
+            }
+
+            .heading-display {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>
+            <span class="status-indicator" id="status"></span>
+            ESP32 Digital Compass
+            <span class="demo-badge">Demo Mode</span>
+        </h1>
+        <button class="theme-toggle" id="themeToggle">Toggle Light Mode</button>
+    </header>
+
+    <main>
+        <div class="compass-container">
+            <div class="compass-outer">
+                <div class="compass-inner">
+                    <div class="compass-marks" id="compassMarks"></div>
+                    <div class="compass-cardinal cardinal-n">N</div>
+                    <div class="compass-cardinal cardinal-e">E</div>
+                    <div class="compass-cardinal cardinal-s">S</div>
+                    <div class="compass-cardinal cardinal-w">W</div>
+                    <div class="compass-needle" id="needle">
+                        <div class="needle-north"></div>
+                        <div class="needle-south"></div>
+                    </div>
+                    <div class="compass-center"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-panel">
+            <div class="heading-display">
+                <div class="data-value" id="heading">N</div>
+                <div class="data-label" id="direction">North</div>
+            </div>
+
+            <div class="data-row">
+                <span class="data-label">Heading</span>
+                <span class="data-value" id="headingDegrees">0.0°</span>
+            </div>
+
+            <div class="mag-data">
+                <div class="mag-axis">
+                    <div class="mag-axis-label">X Axis</div>
+                    <div class="mag-axis-value" id="magX">25.50 µT</div>
+                </div>
+                <div class="mag-axis">
+                    <div class="mag-axis-label">Y Axis</div>
+                    <div class="mag-axis-value" id="magY">-12.30 µT</div>
+                </div>
+                <div class="mag-axis">
+                    <div class="mag-axis-label">Z Axis</div>
+                    <div class="mag-axis-value" id="magZ">45.20 µT</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>ESP32 Digital Compass with LSM303AGR Sensor | Powered by ESP32 | <strong>DEMO MODE - Simulated Data</strong></p>
+    </footer>
+
+    <script>
+        // Theme management
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+
+        // Set dark mode as default
+        if (!localStorage.getItem('theme')) {
+            localStorage.setItem('theme', 'dark');
+        }
+
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'light') {
+            htmlElement.setAttribute('data-theme', 'light');
+            themeToggle.textContent = 'Toggle Dark Mode';
+        } else {
+            themeToggle.textContent = 'Toggle Light Mode';
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const theme = htmlElement.getAttribute('data-theme');
+            if (theme === 'light') {
+                htmlElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'dark');
+                themeToggle.textContent = 'Toggle Light Mode';
+            } else {
+                htmlElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('theme', 'light');
+                themeToggle.textContent = 'Toggle Dark Mode';
+            }
+        });
+
+        // Generate degree labels around the compass
+        const compassInner = document.querySelector('.compass-inner');
+        const radiusPercent = 32; // Position at 32% from center (between center and edge)
+
+        for (let deg = 0; deg < 360; deg += 45) {
+            const label = document.createElement('div');
+            label.className = 'compass-degree';
+            label.textContent = deg + '°';
+
+            // Calculate position - start from 0 at top
+            const angle = (deg - 90) * Math.PI / 180; // -90 to make 0° at top
+            const x = 50 + radiusPercent * Math.cos(angle);
+            const y = 50 + radiusPercent * Math.sin(angle);
+
+            label.style.left = x + '%';
+            label.style.top = y + '%';
+
+            compassInner.appendChild(label);
+        }
+
+        // Get DOM elements
+        const status = document.getElementById('status');
+        const needle = document.getElementById('needle');
+        const heading = document.getElementById('heading');
+        const direction = document.getElementById('direction');
+        const headingDegrees = document.getElementById('headingDegrees');
+        const magX = document.getElementById('magX');
+        const magY = document.getElementById('magY');
+        const magZ = document.getElementById('magZ');
+
+        // Simulate compass rotation
+        let currentHeading = 0;
+        let targetHeading = 0;
+        let lastChangeTime = Date.now();
+
+        function getCardinalDirection(deg) {
+            const directions = [
+                "N", "NNE", "NE", "ENE",
+                "E", "ESE", "SE", "SSE",
+                "S", "SSW", "SW", "WSW",
+                "W", "WNW", "NW", "NNW"
+            ];
+            const index = Math.round(deg / 22.5) % 16;
+            return directions[index];
+        }
+
+        function updateCompass() {
+            // Change target heading every 3-8 seconds
+            if (Date.now() - lastChangeTime > (3000 + Math.random() * 5000)) {
+                targetHeading = Math.random() * 360;
+                lastChangeTime = Date.now();
+            }
+
+            // Smoothly interpolate towards target
+            const diff = targetHeading - currentHeading;
+            const shortestDiff = ((diff + 180) % 360) - 180;
+            currentHeading += shortestDiff * 0.02;
+            currentHeading = (currentHeading + 360) % 360;
+
+            // Update needle rotation (keep centered with translate)
+            needle.style.transform = `translate(-50%, -50%) rotate(${currentHeading}deg)`;
+
+            // Update displays
+            const cardinalDir = getCardinalDirection(currentHeading);
+            heading.textContent = cardinalDir;
+            headingDegrees.textContent = `${currentHeading.toFixed(1)}°`;
+            direction.textContent = cardinalDir;
+
+            // Simulate magnetometer readings based on heading
+            const headingRad = currentHeading * Math.PI / 180;
+            const magXVal = Math.cos(headingRad) * 25 + (Math.random() - 0.5) * 2;
+            const magYVal = Math.sin(headingRad) * 25 + (Math.random() - 0.5) * 2;
+            const magZVal = 45 + (Math.random() - 0.5) * 3;
+
+            magX.textContent = `${magXVal.toFixed(2)} µT`;
+            magY.textContent = `${magYVal.toFixed(2)} µT`;
+            magZ.textContent = `${magZVal.toFixed(2)} µT`;
+        }
+
+        // Show as connected
+        status.classList.remove('disconnected');
+
+        // Update compass at 10Hz
+        setInterval(updateCompass, 100);
+
+        console.log('Demo mode active - simulating compass rotation');
+    </script>
+</body>
+</html>

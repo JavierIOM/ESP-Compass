@@ -1,0 +1,21 @@
+# Arduino
+*.hex
+*.eep
+*.elf
+
+# Build outputs
+build/
+.pio/
+.vscode/
+
+# IDE files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Credentials (remember to update WiFi settings before uploading!)
+# credentials.h
+
+# SPIFFS build
+data/.DS_Store
