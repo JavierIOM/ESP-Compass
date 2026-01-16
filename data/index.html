@@ -379,7 +379,7 @@
     </main>
 
     <footer>
-        <p>ESP32 Digital Compass with LSM303AGR Sensor | v0.0.1 (untested) | Powered by ESP32 | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
+        <p>ESP32 Digital Compass with LSM303AGR Sensor | v0.0.2 | Powered by ESP32 | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
     </footer>
 
     <script>
@@ -457,8 +457,12 @@
             };
 
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                updateCompass(data);
+                try {
+                    const data = JSON.parse(event.data);
+                    updateCompass(data);
+                } catch (e) {
+                    console.error('Failed to parse compass data:', e);
+                }
             };
 
             ws.onerror = (error) => {

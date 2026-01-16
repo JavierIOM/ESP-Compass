@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
-#include <AsyncWebSocket.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM303_Accel.h>
@@ -28,6 +27,9 @@ const unsigned long updateInterval = 100; // Update every 100ms
 float magOffsetX = 0.0;
 float magOffsetY = 0.0;
 float magOffsetZ = 0.0;
+
+// Pre-allocated buffer for JSON to reduce heap fragmentation
+char jsonBuffer[128];
 
 // Forward declarations
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -61,7 +63,8 @@ void setup() {
   // Initialize SPIFFS for serving web files
   if (!SPIFFS.begin(true)) {
     Serial.println("ERROR: SPIFFS mount failed!");
-    return;
+    Serial.println("Web interface will not be available.");
+    while (1) delay(10);  // Halt execution - web server won't work without SPIFFS
   }
 
   // Start Access Point
@@ -128,33 +131,58 @@ void loop() {
     // Get cardinal direction
     String direction = getCardinalDirection(heading);
 
-    // Send data to all connected WebSocket clients
-    String json = "{";
-    json += "\"heading\":" + String(heading, 1) + ",";
-    json += "\"direction\":\"" + direction + "\",";
-    json += "\"mag_x\":" + String(mag_x, 2) + ",";
-    json += "\"mag_y\":" + String(mag_y, 2) + ",";
-    json += "\"mag_z\":" + String(mag_z, 2);
-    json += "}";
+    // Send data to all connected WebSocket clients using pre-allocated buffer
+    snprintf(jsonBuffer, sizeof(jsonBuffer),
+      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f}",
+      heading, direction.c_str(), mag_x, mag_y, mag_z);
 
-    ws.textAll(json);
+    ws.textAll(jsonBuffer);
   }
 }
 
 float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, float my, float mz) {
-  // Normalize accelerometer values
+  // Normalize accelerometer values with division-by-zero protection
   float accel_norm = sqrt(ax * ax + ay * ay + az * az);
+
+  // Protect against division by zero (sensor fault or initialization)
+  if (accel_norm < 0.001) {
+    accel_norm = 0.001;
+  }
+
   ax /= accel_norm;
   ay /= accel_norm;
   az /= accel_norm;
 
-  // Calculate pitch and roll
+  // Clamp ax to valid range for asin (-1 to 1) to prevent NaN
+  if (ax > 1.0) ax = 1.0;
+  if (ax < -1.0) ax = -1.0;
+
+  // Calculate pitch
   float pitch = asin(-ax);
-  float roll = asin(ay / cos(pitch));
+
+  // Calculate roll with gimbal lock protection
+  float cos_pitch = cos(pitch);
+  float roll;
+
+  // Protect against division by zero near gimbal lock (pitch near +/-90 degrees)
+  if (fabs(cos_pitch) < 0.01) {
+    // Near gimbal lock - use simplified calculation
+    roll = 0.0;
+  } else {
+    // Clamp ay/cos(pitch) to valid range for asin
+    float roll_arg = ay / cos_pitch;
+    if (roll_arg > 1.0) roll_arg = 1.0;
+    if (roll_arg < -1.0) roll_arg = -1.0;
+    roll = asin(roll_arg);
+  }
 
   // Tilt compensated magnetic field components
-  float mag_x_comp = mx * cos(pitch) + mz * sin(pitch);
-  float mag_y_comp = mx * sin(roll) * sin(pitch) + my * cos(roll) - mz * sin(roll) * cos(pitch);
+  float cos_roll = cos(roll);
+  float sin_roll = sin(roll);
+  float sin_pitch = sin(pitch);
+
+  float mag_x_comp = mx * cos_pitch + mz * sin_pitch;
+  float mag_y_comp = mx * sin_roll * sin_pitch + my * cos_roll - mz * sin_roll * cos_pitch;
 
   // Calculate heading
   float heading = atan2(mag_y_comp, mag_x_comp);
@@ -164,14 +192,24 @@ float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, fl
 
 String getCardinalDirection(float heading) {
   // Convert heading to 16-point compass rose
-  const char* directions[] = {
+  static const char* directions[] = {
     "N", "NNE", "NE", "ENE",
     "E", "ESE", "SE", "SSE",
     "S", "SSW", "SW", "WSW",
     "W", "WNW", "NW", "NNW"
   };
 
+  // Ensure heading is in valid range (0-360)
+  while (heading < 0) heading += 360.0;
+  while (heading >= 360.0) heading -= 360.0;
+
+  // Calculate index safely (always positive due to range normalization above)
   int index = (int)((heading + 11.25) / 22.5) % 16;
+
+  // Extra safety check for index bounds
+  if (index < 0) index = 0;
+  if (index > 15) index = 15;
+
   return directions[index];
 }
 

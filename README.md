@@ -1,6 +1,6 @@
 # ESP32 Digital Compass
 
-**Version 0.0.1** (Pre-release - untested on hardware)
+**Version 0.0.2** (Pre-release - untested on hardware)
 
 A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
@@ -367,6 +367,20 @@ Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
 
+- **v0.0.2** (January 2025)
+  - **Bug Fixes:**
+    - Fixed critical division-by-zero in tilt compensation when device is tilted near vertical
+    - Fixed gimbal lock handling when pitch approaches ±90 degrees
+    - Fixed potential NaN values from asin() with out-of-range inputs
+    - Fixed potential negative array index in cardinal direction lookup
+    - Fixed SPIFFS mount failure now properly halts execution with error message
+  - **Improvements:**
+    - Replaced String concatenation with pre-allocated buffer to prevent heap fragmentation
+    - Added JSON parse error handling in web interface
+    - Removed redundant AsyncWebSocket include
+    - Added bounds checking throughout compass calculations
+  - **Note:** Code reviewed and hardened, still untested on hardware
+
 - **v0.0.1** (January 2025)
   - Initial PlatformIO setup
   - Migrated from Arduino IDE to PlatformIO
@@ -375,7 +389,6 @@ Edit `data/index.html` CSS variables to customize colors and styling.
   - Dark/Light mode interface
   - FireBeetle ESP32 support
   - STEMMA QT connector support
-  - **Note:** Untested on hardware
 
 ## Dependencies
 
