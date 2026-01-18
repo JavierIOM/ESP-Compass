@@ -231,7 +231,7 @@ module case_lid() {
 
     translate([case_length/2, case_width/2 - 10, 2 - 0.3])
         linear_extrude(0.4)
-            text("v0.0.3", size=4, halign="center", valign="center", $fn=32);
+            text("v0.0.4", size=4, halign="center", valign="center", $fn=32);
 }
 
 // ============================================

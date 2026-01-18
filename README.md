@@ -1,6 +1,6 @@
 # ESP32 Digital Compass
 
-**Version 0.0.3** (Hardware Tested)
+**Version 0.0.4** (Hardware Tested)
 
 A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
@@ -391,6 +391,13 @@ const unsigned long updateInterval = 100; // milliseconds
 Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
+
+- **v0.0.4** (January 2025) - **Hardware Tested**
+  - **Bug Fixes:**
+    - Fixed compass needle rotating in wrong direction (inverted heading)
+  - **Improvements:**
+    - Added 5-sample moving average filter for smoother heading display
+    - Uses circular mean algorithm to handle 0°/360° wraparound correctly
 
 - **v0.0.3** (January 2025) - **Hardware Tested**
   - **New Features:**

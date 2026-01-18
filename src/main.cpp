@@ -50,6 +50,12 @@ float magMinZ, magMaxZ;
 // Pre-allocated buffer for JSON to reduce heap fragmentation
 char jsonBuffer[256];
 
+// Smoothing filter for heading
+#define SMOOTHING_SAMPLES 5
+float headingHistory[SMOOTHING_SAMPLES];
+int headingIndex = 0;
+bool headingBufferFilled = false;
+
 // Forward declarations
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data, size_t len);
@@ -149,6 +155,19 @@ void loop() {
     float raw_mag_y = mag_event.magnetic.y;
     float raw_mag_z = mag_event.magnetic.z;
 
+    // Debug output - print raw sensor data every second
+    static unsigned long lastDebugPrint = 0;
+    if (millis() - lastDebugPrint >= 1000) {
+      lastDebugPrint = millis();
+      Serial.println("--- RAW SENSOR DATA ---");
+      Serial.printf("Accel: X=%.2f Y=%.2f Z=%.2f m/s²\n",
+        accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z);
+      Serial.printf("Mag Raw: X=%.2f Y=%.2f Z=%.2f µT\n", raw_mag_x, raw_mag_y, raw_mag_z);
+      Serial.printf("Mag Cal: X=%.2f Y=%.2f Z=%.2f µT (offsets: %.2f, %.2f, %.2f)\n",
+        raw_mag_x - magOffsetX, raw_mag_y - magOffsetY, raw_mag_z - magOffsetZ,
+        magOffsetX, magOffsetY, magOffsetZ);
+    }
+
     // Update calibration if in progress (use raw values)
     if (calibrating) {
       updateCalibration(raw_mag_x, raw_mag_y, raw_mag_z);
@@ -171,6 +190,24 @@ void loop() {
     heading = heading * 180.0 / PI;
     if (heading < 0) {
       heading += 360.0;
+    }
+
+    // Apply smoothing filter (circular average to handle 0/360 wraparound)
+    headingHistory[headingIndex] = heading;
+    headingIndex = (headingIndex + 1) % SMOOTHING_SAMPLES;
+    if (headingIndex == 0) headingBufferFilled = true;
+
+    int samplesToUse = headingBufferFilled ? SMOOTHING_SAMPLES : headingIndex;
+    if (samplesToUse > 0) {
+      // Use circular mean to handle wraparound at 0/360
+      float sinSum = 0, cosSum = 0;
+      for (int i = 0; i < samplesToUse; i++) {
+        float rad = headingHistory[i] * PI / 180.0;
+        sinSum += sin(rad);
+        cosSum += cos(rad);
+      }
+      heading = atan2(sinSum, cosSum) * 180.0 / PI;
+      if (heading < 0) heading += 360.0;
     }
 
     // Get cardinal direction
@@ -237,8 +274,8 @@ float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, fl
   float mag_x_comp = mx * cos_pitch + mz * sin_pitch;
   float mag_y_comp = mx * sin_roll * sin_pitch + my * cos_roll - mz * sin_roll * cos_pitch;
 
-  // Calculate heading
-  float heading = atan2(mag_y_comp, mag_x_comp);
+  // Calculate heading (negated to correct for sensor orientation)
+  float heading = -atan2(mag_y_comp, mag_x_comp);
 
   return heading;
 }
