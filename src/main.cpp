@@ -6,6 +6,15 @@
 #include <Adafruit_LSM303_Accel.h>
 #include <Adafruit_LIS2MDL.h>
 #include <SPIFFS.h>
+#include <EEPROM.h>
+
+// EEPROM configuration
+#define EEPROM_SIZE 64
+#define CALIBRATION_MAGIC 0xCAFE  // Magic number to verify valid calibration data
+#define EEPROM_MAGIC_ADDR 0
+#define EEPROM_OFFSET_X_ADDR 2
+#define EEPROM_OFFSET_Y_ADDR 6
+#define EEPROM_OFFSET_Z_ADDR 10
 
 // Access Point credentials - CHANGE THESE IF DESIRED
 const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
@@ -23,19 +32,34 @@ AsyncWebSocket ws("/ws");
 unsigned long lastUpdate = 0;
 const unsigned long updateInterval = 100; // Update every 100ms
 
-// Calibration offsets (you may need to calibrate these)
+// Calibration offsets (loaded from EEPROM or set via calibration)
 float magOffsetX = 0.0;
 float magOffsetY = 0.0;
 float magOffsetZ = 0.0;
 
+// Calibration state
+bool calibrating = false;
+unsigned long calibrationStartTime = 0;
+const unsigned long calibrationDuration = 15000; // 15 seconds
+
+// Min/Max tracking during calibration
+float magMinX, magMaxX;
+float magMinY, magMaxY;
+float magMinZ, magMaxZ;
+
 // Pre-allocated buffer for JSON to reduce heap fragmentation
-char jsonBuffer[128];
+char jsonBuffer[256];
 
 // Forward declarations
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data, size_t len);
 float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, float my, float mz);
 String getCardinalDirection(float heading);
+void loadCalibration();
+void saveCalibration();
+void startCalibration();
+void updateCalibration(float mx, float my, float mz);
+void finishCalibration();
 
 void setup() {
   Serial.begin(115200);
@@ -43,6 +67,9 @@ void setup() {
 
   Serial.println("\n\nESP32 Digital Compass");
   Serial.println("=====================");
+
+  // Initialize EEPROM
+  EEPROM.begin(EEPROM_SIZE);
 
   // Initialize I2C
   Wire.begin();
@@ -59,6 +86,9 @@ void setup() {
   }
 
   Serial.println("LSM303AGR sensors initialized successfully!");
+
+  // Load calibration from EEPROM
+  loadCalibration();
 
   // Initialize SPIFFS for serving web files
   if (!SPIFFS.begin(true)) {
@@ -98,6 +128,11 @@ void loop() {
   // Clean up WebSocket clients
   ws.cleanupClients();
 
+  // Check if calibration is complete
+  if (calibrating && (millis() - calibrationStartTime >= calibrationDuration)) {
+    finishCalibration();
+  }
+
   // Read and send compass data at regular intervals
   if (millis() - lastUpdate >= updateInterval) {
     lastUpdate = millis();
@@ -109,10 +144,20 @@ void loop() {
     accel.getEvent(&accel_event);
     mag.getEvent(&mag_event);
 
+    // Get raw magnetometer values
+    float raw_mag_x = mag_event.magnetic.x;
+    float raw_mag_y = mag_event.magnetic.y;
+    float raw_mag_z = mag_event.magnetic.z;
+
+    // Update calibration if in progress (use raw values)
+    if (calibrating) {
+      updateCalibration(raw_mag_x, raw_mag_y, raw_mag_z);
+    }
+
     // Apply calibration offsets
-    float mag_x = mag_event.magnetic.x - magOffsetX;
-    float mag_y = mag_event.magnetic.y - magOffsetY;
-    float mag_z = mag_event.magnetic.z - magOffsetZ;
+    float mag_x = raw_mag_x - magOffsetX;
+    float mag_y = raw_mag_y - magOffsetY;
+    float mag_z = raw_mag_z - magOffsetZ;
 
     // Calculate heading with tilt compensation
     float heading = calculateTiltCompensatedHeading(
@@ -131,10 +176,18 @@ void loop() {
     // Get cardinal direction
     String direction = getCardinalDirection(heading);
 
+    // Calculate remaining calibration time
+    int calRemaining = 0;
+    if (calibrating) {
+      calRemaining = (int)((calibrationDuration - (millis() - calibrationStartTime)) / 1000) + 1;
+      if (calRemaining < 0) calRemaining = 0;
+    }
+
     // Send data to all connected WebSocket clients using pre-allocated buffer
     snprintf(jsonBuffer, sizeof(jsonBuffer),
-      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f}",
-      heading, direction.c_str(), mag_x, mag_y, mag_z);
+      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d}",
+      heading, direction.c_str(), mag_x, mag_y, mag_z,
+      calibrating ? "true" : "false", calRemaining);
 
     ws.textAll(jsonBuffer);
   }
@@ -220,5 +273,100 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                   client->id(), client->remoteIP().toString().c_str());
   } else if (type == WS_EVT_DISCONNECT) {
     Serial.printf("WebSocket client #%u disconnected\n", client->id());
+  } else if (type == WS_EVT_DATA) {
+    // Handle incoming data (calibration commands)
+    AwsFrameInfo *info = (AwsFrameInfo*)arg;
+    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+      data[len] = 0; // Null terminate
+      String msg = (char*)data;
+
+      if (msg.indexOf("startCal") >= 0) {
+        startCalibration();
+        Serial.println("Calibration started via WebSocket");
+      } else if (msg.indexOf("clearCal") >= 0) {
+        // Clear calibration
+        magOffsetX = 0.0;
+        magOffsetY = 0.0;
+        magOffsetZ = 0.0;
+        saveCalibration();
+        Serial.println("Calibration cleared via WebSocket");
+      }
+    }
   }
+}
+
+// Load calibration offsets from EEPROM
+void loadCalibration() {
+  uint16_t magic;
+  EEPROM.get(EEPROM_MAGIC_ADDR, magic);
+
+  if (magic == CALIBRATION_MAGIC) {
+    EEPROM.get(EEPROM_OFFSET_X_ADDR, magOffsetX);
+    EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
+    EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
+    Serial.println("Calibration loaded from EEPROM:");
+    Serial.printf("  Offset X: %.2f\n", magOffsetX);
+    Serial.printf("  Offset Y: %.2f\n", magOffsetY);
+    Serial.printf("  Offset Z: %.2f\n", magOffsetZ);
+  } else {
+    Serial.println("No calibration data found in EEPROM");
+    magOffsetX = 0.0;
+    magOffsetY = 0.0;
+    magOffsetZ = 0.0;
+  }
+}
+
+// Save calibration offsets to EEPROM
+void saveCalibration() {
+  uint16_t magic = CALIBRATION_MAGIC;
+  EEPROM.put(EEPROM_MAGIC_ADDR, magic);
+  EEPROM.put(EEPROM_OFFSET_X_ADDR, magOffsetX);
+  EEPROM.put(EEPROM_OFFSET_Y_ADDR, magOffsetY);
+  EEPROM.put(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
+  EEPROM.commit();
+  Serial.println("Calibration saved to EEPROM");
+}
+
+// Start calibration process
+void startCalibration() {
+  calibrating = true;
+  calibrationStartTime = millis();
+
+  // Initialize min/max with extreme values
+  magMinX = 99999.0;
+  magMaxX = -99999.0;
+  magMinY = 99999.0;
+  magMaxY = -99999.0;
+  magMinZ = 99999.0;
+  magMaxZ = -99999.0;
+
+  Serial.println("Calibration started - rotate the compass in all directions");
+}
+
+// Update calibration with new magnetometer reading
+void updateCalibration(float mx, float my, float mz) {
+  if (mx < magMinX) magMinX = mx;
+  if (mx > magMaxX) magMaxX = mx;
+  if (my < magMinY) magMinY = my;
+  if (my > magMaxY) magMaxY = my;
+  if (mz < magMinZ) magMinZ = mz;
+  if (mz > magMaxZ) magMaxZ = mz;
+}
+
+// Finish calibration and calculate offsets
+void finishCalibration() {
+  calibrating = false;
+
+  // Calculate offsets as midpoint of min/max (hard-iron correction)
+  magOffsetX = (magMinX + magMaxX) / 2.0;
+  magOffsetY = (magMinY + magMaxY) / 2.0;
+  magOffsetZ = (magMinZ + magMaxZ) / 2.0;
+
+  // Save to EEPROM
+  saveCalibration();
+
+  Serial.println("Calibration complete!");
+  Serial.printf("  Min X: %.2f, Max X: %.2f, Offset X: %.2f\n", magMinX, magMaxX, magOffsetX);
+  Serial.printf("  Min Y: %.2f, Max Y: %.2f, Offset Y: %.2f\n", magMinY, magMaxY, magOffsetY);
+  Serial.printf("  Min Z: %.2f, Max Z: %.2f, Offset Z: %.2f\n", magMinZ, magMaxZ, magOffsetZ);
 }

@@ -273,6 +273,85 @@
             color: var(--text-primary);
         }
 
+        .calibration-panel {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .calibration-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: #dc2626;
+            border-color: #dc2626;
+        }
+
+        .btn-primary:disabled {
+            background: var(--bg-tertiary);
+            border-color: var(--border);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .calibration-status {
+            text-align: center;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        .calibration-status.active {
+            display: block;
+        }
+
+        .calibration-status .countdown {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 0.5rem 0;
+        }
+
+        .calibration-status .instructions {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .calibration-complete {
+            color: var(--success);
+            font-weight: 600;
+        }
+
         footer {
             background: var(--bg-secondary);
             border-top: 1px solid var(--border);
@@ -375,11 +454,23 @@
                     <div class="mag-axis-value" id="magZ">---</div>
                 </div>
             </div>
+
+            <div class="calibration-panel">
+                <div class="calibration-buttons">
+                    <button class="btn btn-primary" id="calibrateBtn" onclick="startCalibration()">Calibrate</button>
+                    <button class="btn btn-secondary" id="clearCalBtn" onclick="clearCalibration()">Clear Calibration</button>
+                </div>
+                <div class="calibration-status" id="calibrationStatus">
+                    <div class="instructions">Rotate the compass slowly in all directions</div>
+                    <div class="countdown" id="countdown">15</div>
+                    <div class="instructions">seconds remaining</div>
+                </div>
+            </div>
         </div>
     </main>
 
     <footer>
-        <p>ESP32 Digital Compass with LSM303AGR Sensor | v0.0.2 | Powered by ESP32 | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
+        <p>ESP32 Digital Compass with LSM303AGR Sensor | v0.0.3 | Powered by ESP32 | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
     </footer>
 
     <script>
@@ -443,6 +534,13 @@
         const magX = document.getElementById('magX');
         const magY = document.getElementById('magY');
         const magZ = document.getElementById('magZ');
+        const calibrateBtn = document.getElementById('calibrateBtn');
+        const clearCalBtn = document.getElementById('clearCalBtn');
+        const calibrationStatus = document.getElementById('calibrationStatus');
+        const countdown = document.getElementById('countdown');
+
+        let isCalibrating = false;
+        let wasCalibrating = false;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -491,6 +589,47 @@
             magX.textContent = `${data.mag_x.toFixed(2)} µT`;
             magY.textContent = `${data.mag_y.toFixed(2)} µT`;
             magZ.textContent = `${data.mag_z.toFixed(2)} µT`;
+
+            // Update calibration UI
+            isCalibrating = data.calibrating;
+            if (isCalibrating) {
+                calibrateBtn.disabled = true;
+                calibrateBtn.textContent = 'Calibrating...';
+                clearCalBtn.disabled = true;
+                calibrationStatus.classList.add('active');
+                countdown.textContent = data.calRemaining;
+                wasCalibrating = true;
+            } else {
+                calibrateBtn.disabled = false;
+                calibrateBtn.textContent = 'Calibrate';
+                clearCalBtn.disabled = false;
+
+                // Show completion message briefly
+                if (wasCalibrating) {
+                    calibrationStatus.innerHTML = '<div class="calibration-complete">Calibration Complete!</div>';
+                    setTimeout(() => {
+                        calibrationStatus.classList.remove('active');
+                        calibrationStatus.innerHTML = `
+                            <div class="instructions">Rotate the compass slowly in all directions</div>
+                            <div class="countdown" id="countdown">15</div>
+                            <div class="instructions">seconds remaining</div>
+                        `;
+                    }, 2000);
+                    wasCalibrating = false;
+                }
+            }
+        }
+
+        function startCalibration() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({cmd: 'startCal'}));
+            }
+        }
+
+        function clearCalibration() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({cmd: 'clearCal'}));
+            }
         }
 
         // Connect on load

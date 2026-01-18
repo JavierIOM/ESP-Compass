@@ -1,6 +1,6 @@
 # ESP32 Digital Compass
 
-**Version 0.0.2** (Pre-release - untested on hardware)
+**Version 0.0.3** (Hardware Tested)
 
 A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
@@ -216,26 +216,23 @@ The compass interface will load immediately!
 
 ### Calibration
 
-The compass may need calibration for accurate readings in your location.
+The compass includes an automatic calibration feature for accurate readings.
 
 **Calibration Procedure:**
 
-1. Open the compass web interface
-2. Watch the magnetometer X, Y, Z values at the bottom
-3. Slowly rotate the sensor in all directions:
+1. Open the compass web interface at **http://192.168.4.1**
+2. Click the **"Calibrate"** button
+3. During the 15-second countdown:
+   - Slowly rotate the sensor in all directions
    - Complete 360° horizontal rotation
    - Tilt up and down
    - Roll side to side
    - Figure-8 pattern works well
-4. Note the min/max values for each axis
-5. Calculate offsets: `offset = (min + max) / 2`
-6. Update `src/main.cpp` (lines 28-30):
-   ```cpp
-   float magOffsetX = <your_x_offset>;
-   float magOffsetY = <your_y_offset>;
-   float magOffsetZ = <your_z_offset>;
-   ```
-7. Rebuild and re-upload the firmware
+4. Calibration completes automatically
+5. Offsets are saved to EEPROM and persist across reboots
+
+**Clear Calibration:**
+- Click the **"Clear Calibration"** button to reset offsets to zero
 
 ### Tips for Best Results
 
@@ -367,6 +364,19 @@ Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
 
+- **v0.0.3** (January 2025) - **Hardware Tested**
+  - **New Features:**
+    - Added automatic magnetometer calibration via web interface
+    - Calibration button with 15-second countdown timer
+    - Clear calibration button to reset offsets
+    - Calibration data saved to EEPROM (persists across reboots)
+    - Real-time calibration status display in web UI
+  - **Technical Details:**
+    - Hard-iron calibration using min/max method
+    - EEPROM storage with magic number validation
+    - WebSocket commands for calibration control
+  - **Status:** Successfully tested on hardware
+
 - **v0.0.2** (January 2025)
   - **Bug Fixes:**
     - Fixed critical division-by-zero in tilt compensation when device is tilted near vertical
@@ -379,7 +389,6 @@ Edit `data/index.html` CSS variables to customize colors and styling.
     - Added JSON parse error handling in web interface
     - Removed redundant AsyncWebSocket include
     - Added bounds checking throughout compass calculations
-  - **Note:** Code reviewed and hardened, still untested on hardware
 
 - **v0.0.1** (January 2025)
   - Initial PlatformIO setup
