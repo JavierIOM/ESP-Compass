@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd magnetometer calibration feature and release v0.0.3\n\n- Add automatic calibration via web interface with 15-second procedure\n- Store calibration offsets in EEPROM \\(persists across reboots\\)\n- Add Calibrate and Clear Calibration buttons to web UI\n- Add real-time countdown timer during calibration\n- Use hard-iron calibration \\(min/max method\\) for offset calculation\n- Hardware tested successfully\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
