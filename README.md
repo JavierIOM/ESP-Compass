@@ -126,8 +126,36 @@ ESP-Compass/
 │   └── main.cpp            # Main application code
 ├── data/
 │   └── index.html          # Web interface (uploaded to SPIFFS)
+├── case/
+│   └── compass_case.scad   # 3D printable case (OpenSCAD)
 └── README.md
 ```
+
+## 3D Printable Case
+
+A custom 3D printable case is included in the `case/` folder.
+
+**Features:**
+- Mounting standoffs for FireBeetle ESP32 (M3 screws)
+- Mounting standoffs for LSM303AGR sensor (M2.5 screws)
+- 18650 battery cradle
+- USB port cutout
+- Snap-fit lid
+
+**Print Settings:**
+- Layer height: 0.2mm
+- Infill: 20%
+- Supports: Not required
+- Material: PLA or PETG
+
+**Files:**
+- `compass_case.scad` - OpenSCAD source (parametric, customizable)
+- STL files available in releases
+
+**Hardware needed for case:**
+- 4x M3 screws (6-8mm) for FireBeetle
+- 4x M2.5 screws (6-8mm) for LSM303AGR
+- 1x 18650 battery (optional)
 
 ## Installation
 
