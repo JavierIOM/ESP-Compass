@@ -1,14 +1,15 @@
 # ESP32 Digital Compass
 
-**Version 0.0.4** (Hardware Tested)
+**Version 0.0.5** (Hardware Tested)
 
-A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
+A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. Optional BME280 sensor support for temperature, humidity, and pressure readings. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
 ## Features
 
 - Real-time compass heading with tilt compensation
 - 16-point cardinal direction display (N, NNE, NE, etc.)
 - Live magnetometer readings (X, Y, Z axes)
+- **Optional BME280 sensor** for temperature, humidity, and pressure
 - WebSocket-based real-time updates (10Hz)
 - Responsive web interface with animated compass needle
 - Dark/Light mode toggle (dark mode default)
@@ -28,8 +29,9 @@ All parts available from **The Pi Hut** (UK):
 | Sensor | Adafruit LSM303AGR Accelerometer/Magnetometer (ID: 4413) | ~£8-10 | [The Pi Hut](https://thepihut.com/products/adafruit-lsm303agr-accelerometer-magnetometer-stemma-qt-qwiic) |
 | Cable | STEMMA QT to Male Header Cable (150mm) | ~£1 | [The Pi Hut](https://thepihut.com/products/stemma-qt-qwiic-jst-sh-4-pin-to-premium-male-headers-cable) |
 | USB Cable | USB Cable (Micro-USB or USB-C) | Included | Usually comes with board |
+| Environmental Sensor (Optional) | BME280 Temperature/Humidity/Pressure | ~£5-8 | [The Pi Hut](https://thepihut.com/products/bme280-breakout-temperature-pressure-humidity-sensor) |
 
-**Total Cost: ~£17-21**
+**Total Cost: ~£17-21** (or ~£22-29 with optional BME280)
 
 ### Why FireBeetle ESP32?
 
@@ -87,6 +89,19 @@ The LSM303AGR connects to the FireBeetle ESP32 using the STEMMA QT cable:
 
 **Note:** The LSM303AGR board has voltage regulation and works with both 3.3V and 5V input. The FireBeetle ESP32 GPIO pins are 3.3V logic level.
 
+### Optional: BME280 Environmental Sensor
+
+The BME280 provides temperature, humidity, and pressure readings. It connects to the same I2C bus:
+
+| BME280 Pin | FireBeetle ESP32 Pin | Notes |
+|------------|----------------------|-------|
+| VIN | 3.3V | Power supply |
+| GND | GND | Ground |
+| SDA | GPIO 21 (SDA) | I2C Data (shared with LSM303) |
+| SCL | GPIO 22 (SCL) | I2C Clock (shared with LSM303) |
+
+**Note:** The BME280 is optional. If not connected, the compass works normally without environmental data.
+
 ## Software Requirements
 
 ### PlatformIO Setup (Recommended)
@@ -138,9 +153,10 @@ A custom 3D printable case is included in the `case/` folder.
 **Features:**
 - Mounting standoffs for FireBeetle ESP32 (M3 screws)
 - Mounting standoffs for LSM303AGR sensor (M2.5 screws)
-- 18650 battery cradle
+- Flat Li-Po battery compartment (65x36x10mm, 3000mAh)
+- Separate platform piece for easy assembly
 - USB port cutout
-- Snap-fit lid
+- 5mm perspex/acrylic lid with DXF cutting template
 
 **Print Settings:**
 - Layer height: 0.2mm
@@ -150,12 +166,14 @@ A custom 3D printable case is included in the `case/` folder.
 
 **Files:**
 - `compass_case.scad` - OpenSCAD source (parametric, customizable)
+- `lid_template.dxf` - DXF file for laser cutting the perspex lid
 - STL files available in releases
 
 **Hardware needed for case:**
 - 4x M3 screws (6-8mm) for FireBeetle
 - 4x M2.5 screws (6-8mm) for LSM303AGR
-- 1x 18650 battery (optional)
+- 1x 3000mAh flat Li-Po battery (65x36x10mm)
+- 1x 5mm clear perspex/acrylic sheet (78x62mm with 4mm corner radius)
 
 ## Installation
 
@@ -367,9 +385,13 @@ The FireBeetle ESP32 has excellent battery support:
     "direction": "WSW",
     "mag_x": 23.45,
     "mag_y": -12.34,
-    "mag_z": 45.67
+    "mag_z": 45.67,
+    "temperature": 22.5,
+    "humidity": 45.2,
+    "pressure": 1013.25
   }
   ```
+- Environmental data (temperature, humidity, pressure) only included when BME280 is connected
 - Update frequency: 10Hz (100ms intervals)
 
 ## Customization
@@ -391,6 +413,16 @@ const unsigned long updateInterval = 100; // milliseconds
 Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
+
+- **v0.0.5** (January 2025) - **Hardware Tested**
+  - **New Features:**
+    - Optional BME280 sensor support for temperature, humidity, and pressure
+    - Sensor auto-detection - works with or without BME280 connected
+    - Environmental data panel in web UI (only shown when sensor present)
+  - **Case Design:**
+    - Redesigned case for flat 65x36x10mm Li-Po battery (3000mAh)
+    - Separate platform piece for easier assembly
+    - 5mm perspex/acrylic lid option with DXF cutting template
 
 - **v0.0.4** (January 2025) - **Hardware Tested**
   - **Bug Fixes:**
@@ -441,6 +473,7 @@ Managed automatically by PlatformIO (see `platformio.ini`):
 - Adafruit Unified Sensor
 - Adafruit LSM303 Accel
 - Adafruit LIS2MDL
+- Adafruit BME280 Library
 - AsyncTCP (me-no-dev)
 - ESPAsyncWebServer (me-no-dev)
 
