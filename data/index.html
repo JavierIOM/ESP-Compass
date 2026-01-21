@@ -455,6 +455,23 @@
                 </div>
             </div>
 
+            <div class="env-data" id="envPanel" style="display: none; margin-top: 1rem;">
+                <div class="mag-data">
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Temperature</div>
+                        <div class="mag-axis-value" id="temperature">---</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Humidity</div>
+                        <div class="mag-axis-value" id="humidity">---</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Pressure</div>
+                        <div class="mag-axis-value" id="pressure">---</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="calibration-panel">
                 <div class="calibration-buttons">
                     <button class="btn btn-primary" id="calibrateBtn" onclick="startCalibration()">Calibrate</button>
@@ -538,6 +555,10 @@
         const clearCalBtn = document.getElementById('clearCalBtn');
         const calibrationStatus = document.getElementById('calibrationStatus');
         const countdown = document.getElementById('countdown');
+        const envPanel = document.getElementById('envPanel');
+        const temperature = document.getElementById('temperature');
+        const humidity = document.getElementById('humidity');
+        const pressure = document.getElementById('pressure');
 
         let isCalibrating = false;
         let wasCalibrating = false;
@@ -589,6 +610,14 @@
             magX.textContent = `${data.mag_x.toFixed(2)} µT`;
             magY.textContent = `${data.mag_y.toFixed(2)} µT`;
             magZ.textContent = `${data.mag_z.toFixed(2)} µT`;
+
+            // Update environmental data if available
+            if (data.temperature !== undefined) {
+                envPanel.style.display = 'block';
+                temperature.textContent = `${data.temperature.toFixed(1)}°C`;
+                humidity.textContent = `${data.humidity.toFixed(1)}%`;
+                pressure.textContent = `${data.pressure.toFixed(0)} hPa`;
+            }
 
             // Update calibration UI
             isCalibrating = data.calibrating;

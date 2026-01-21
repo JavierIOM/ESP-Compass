@@ -5,6 +5,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM303_Accel.h>
 #include <Adafruit_LIS2MDL.h>
+#include <Adafruit_BME280.h>
 #include <SPIFFS.h>
 #include <EEPROM.h>
 
@@ -23,6 +24,10 @@ const char* ap_password = "compass123";     // Password (min 8 chars, or "" for 
 // Create sensor objects
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
 Adafruit_LIS2MDL mag = Adafruit_LIS2MDL(12345);
+Adafruit_BME280 bme;
+
+// BME280 status
+bool bmeAvailable = false;
 
 // Web server on port 80
 AsyncWebServer server(80);
@@ -48,7 +53,7 @@ float magMinY, magMaxY;
 float magMinZ, magMaxZ;
 
 // Pre-allocated buffer for JSON to reduce heap fragmentation
-char jsonBuffer[256];
+char jsonBuffer[384];
 
 // Smoothing filter for heading
 #define SMOOTHING_SAMPLES 5
@@ -92,6 +97,15 @@ void setup() {
   }
 
   Serial.println("LSM303AGR sensors initialized successfully!");
+
+  // Try to initialize BME280 (optional sensor)
+  if (bme.begin(0x76) || bme.begin(0x77)) {
+    bmeAvailable = true;
+    Serial.println("BME280 sensor found!");
+  } else {
+    bmeAvailable = false;
+    Serial.println("BME280 not found - continuing without environmental data");
+  }
 
   // Load calibration from EEPROM
   loadCalibration();
@@ -221,10 +235,22 @@ void loop() {
     }
 
     // Send data to all connected WebSocket clients using pre-allocated buffer
-    snprintf(jsonBuffer, sizeof(jsonBuffer),
-      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d}",
-      heading, direction.c_str(), mag_x, mag_y, mag_z,
-      calibrating ? "true" : "false", calRemaining);
+    if (bmeAvailable) {
+      float temperature = bme.readTemperature();
+      float humidity = bme.readHumidity();
+      float pressure = bme.readPressure() / 100.0F; // Convert to hPa
+
+      snprintf(jsonBuffer, sizeof(jsonBuffer),
+        "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d,\"temperature\":%.1f,\"humidity\":%.1f,\"pressure\":%.1f}",
+        heading, direction.c_str(), mag_x, mag_y, mag_z,
+        calibrating ? "true" : "false", calRemaining,
+        temperature, humidity, pressure);
+    } else {
+      snprintf(jsonBuffer, sizeof(jsonBuffer),
+        "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d}",
+        heading, direction.c_str(), mag_x, mag_y, mag_z,
+        calibrating ? "true" : "false", calRemaining);
+    }
 
     ws.textAll(jsonBuffer);
   }
