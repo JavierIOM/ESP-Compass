@@ -33,9 +33,10 @@ All parts available from **The Pi Hut** (UK):
 | Sensor | Adafruit LSM303AGR Accelerometer/Magnetometer (ID: 4413) | ~£8-10 | [The Pi Hut](https://thepihut.com/products/adafruit-lsm303agr-accelerometer-magnetometer-stemma-qt-qwiic) |
 | Cable | STEMMA QT to Male Header Cable (150mm) | ~£1 | [The Pi Hut](https://thepihut.com/products/stemma-qt-qwiic-jst-sh-4-pin-to-premium-male-headers-cable) |
 | USB Cable | USB Cable (Micro-USB or USB-C) | Included | Usually comes with board |
-| Environmental Sensor (Optional) | BME280 Temperature/Humidity/Pressure | ~£5-8 | [The Pi Hut](https://thepihut.com/products/bme280-breakout-temperature-pressure-humidity-sensor) |
+| Environmental Sensor (Optional) | Adafruit BME280 with STEMMA QT (ID: 2652) | ~£15-18 | [The Pi Hut](https://thepihut.com/products/adafruit-bme280-i2c-or-spi-temperature-humidity-pressure-sensor) |
+| STEMMA QT Cable (Optional) | STEMMA QT to STEMMA QT Cable (100mm) | ~£1 | [The Pi Hut](https://thepihut.com/products/stemma-qt-qwiic-jst-sh-4-pin-cable-100mm-long) |
 
-**Total Cost: ~£17-21** (or ~£22-29 with optional BME280)
+**Total Cost: ~£17-21** (or ~£33-40 with optional BME280)
 
 ### Why FireBeetle ESP32?
 
@@ -95,14 +96,32 @@ The LSM303AGR connects to the FireBeetle ESP32 using the STEMMA QT cable:
 
 ### Optional: BME280 Environmental Sensor
 
-The BME280 provides temperature, humidity, and pressure readings. It connects to the same I2C bus:
+The Adafruit BME280 has STEMMA QT connectors, so you can daisy-chain it with the LSM303AGR - no extra wiring needed!
 
-| BME280 Pin | FireBeetle ESP32 Pin | Notes |
-|------------|----------------------|-------|
-| VIN | 3.3V | Power supply |
-| GND | GND | Ground |
-| SDA | GPIO 21 (SDA) | I2C Data (shared with LSM303) |
-| SCL | GPIO 22 (SCL) | I2C Clock (shared with LSM303) |
+```
+┌─────────────────┐
+│  FireBeetle     │
+│    ESP32        │
+└────┬────────────┘
+     │ Pin Headers (GND, 3.3V, SDA, SCL)
+     │
+     └─── STEMMA QT to Male Header Cable
+              │
+     ┌────────▼────────┐
+     │   LSM303AGR     │
+     │  (Compass)      │
+     └────┬────────────┘
+          │ Second STEMMA QT Port
+          │
+          └─── STEMMA QT to STEMMA QT Cable (100mm)
+                   │
+          ┌────────▼────────┐
+          │     BME280      │
+          │ (Environmental) │
+          └─────────────────┘
+```
+
+**Daisy-chain connection:** Both sensors share the same I2C bus. The LSM303AGR has two STEMMA QT ports - plug the BME280 into the spare port using a short STEMMA QT cable.
 
 **Note:** The BME280 is optional. If not connected, the compass works normally without environmental data.
 
