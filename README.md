@@ -17,6 +17,10 @@ A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR 
 - Ultra-low power consumption with battery support
 - Access Point mode - no existing WiFi network required (perfect for field use)
 
+## Screenshot
+
+![ESP32 Digital Compass Web Interface](docs/screenshot.png)
+
 ## Hardware Requirements
 
 ### Bill of Materials (UK)
