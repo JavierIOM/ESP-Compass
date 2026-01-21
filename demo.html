@@ -413,7 +413,7 @@
 
                 <div class="grid-square" style="text-align: center; margin-bottom: 1rem;">
                     <div class="mag-axis-label">Maidenhead Grid Square</div>
-                    <div class="data-value" id="gridSquare" style="font-size: 2rem; letter-spacing: 0.1em;">IO74RD</div>
+                    <div class="data-value" id="gridSquare" style="font-size: 2rem; letter-spacing: 0.1em;">IO74RE</div>
                 </div>
 
                 <div class="mag-data">
@@ -539,7 +539,7 @@
         const accuracy = document.getElementById('accuracy');
         const gridSquare = document.getElementById('gridSquare');
 
-        // Base GPS coordinates (Isle of Man - IO74RD)
+        // Base GPS coordinates (Glen Vine, Isle of Man - IO74RE)
         const baseLat = 54.174447;
         const baseLon = -4.547421;
 
@@ -613,8 +613,8 @@
             satellites.textContent = `${8 + Math.floor(Math.random() * 4)}`;
             accuracy.textContent = `${(2.5 + (Math.random() - 0.5) * 1).toFixed(1)}m`;
 
-            // Grid square stays constant for demo (IO74RD)
-            gridSquare.textContent = 'IO74RD';
+            // Grid square stays constant for demo (IO74RE)
+            gridSquare.textContent = 'IO74RE';
         }
 
         // Show as connected
