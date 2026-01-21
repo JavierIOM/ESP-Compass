@@ -387,11 +387,28 @@
                     <div class="mag-axis-value" id="magZ">45.20 µT</div>
                 </div>
             </div>
+
+            <div class="env-data" style="margin-top: 1rem;">
+                <div class="mag-data">
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Temperature</div>
+                        <div class="mag-axis-value" id="temperature">21.5°C</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Humidity</div>
+                        <div class="mag-axis-value" id="humidity">45.2%</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Pressure</div>
+                        <div class="mag-axis-value" id="pressure">1013 hPa</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
     <footer>
-        <p>ESP32 Digital Compass with LSM303AGR Sensor | Powered by ESP32 | <strong>DEMO MODE - Simulated Data</strong> | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
+        <p>ESP32 Digital Compass with LSM303AGR + BME280 Sensors | v0.0.5 | <strong>DEMO MODE - Simulated Data</strong> | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
     </footer>
 
     <script>
@@ -454,6 +471,9 @@
         const magX = document.getElementById('magX');
         const magY = document.getElementById('magY');
         const magZ = document.getElementById('magZ');
+        const temperature = document.getElementById('temperature');
+        const humidity = document.getElementById('humidity');
+        const pressure = document.getElementById('pressure');
 
         // Simulate compass rotation
         let currentHeading = 0;
@@ -502,6 +522,15 @@
             magX.textContent = `${magXVal.toFixed(2)} µT`;
             magY.textContent = `${magYVal.toFixed(2)} µT`;
             magZ.textContent = `${magZVal.toFixed(2)} µT`;
+
+            // Simulate environmental readings (BME280)
+            const tempVal = 21.5 + (Math.random() - 0.5) * 0.5;
+            const humidityVal = 45 + (Math.random() - 0.5) * 2;
+            const pressureVal = 1013 + (Math.random() - 0.5) * 2;
+
+            temperature.textContent = `${tempVal.toFixed(1)}°C`;
+            humidity.textContent = `${humidityVal.toFixed(1)}%`;
+            pressure.textContent = `${pressureVal.toFixed(0)} hPa`;
         }
 
         // Show as connected
