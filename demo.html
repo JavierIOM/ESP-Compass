@@ -404,11 +404,68 @@
                     </div>
                 </div>
             </div>
+
+            <div class="gps-data" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <div class="gps-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <span class="data-label" style="font-size: 1rem; font-weight: 600;">GPS Location</span>
+                    <span class="gps-fix" style="background: var(--success); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;">3D FIX</span>
+                </div>
+
+                <div class="grid-square" style="text-align: center; margin-bottom: 1rem;">
+                    <div class="mag-axis-label">Maidenhead Grid Square</div>
+                    <div class="data-value" id="gridSquare" style="font-size: 2rem; letter-spacing: 0.1em;">IO74RE</div>
+                </div>
+
+                <div class="mag-data">
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Latitude</div>
+                        <div class="mag-axis-value" id="latitude">54.2361°N</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Longitude</div>
+                        <div class="mag-axis-value" id="longitude">4.5481°W</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Satellites</div>
+                        <div class="mag-axis-value" id="satellites">8</div>
+                    </div>
+                </div>
+
+                <div class="mag-data" style="margin-top: 1rem;">
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Altitude</div>
+                        <div class="mag-axis-value" id="altitude">127m</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Speed</div>
+                        <div class="mag-axis-value" id="speed">0.0 km/h</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Accuracy</div>
+                        <div class="mag-axis-value" id="accuracy">2.5m</div>
+                    </div>
+                </div>
+
+                <div class="map-container" style="margin-top: 1rem; border-radius: 0.5rem; overflow: hidden; border: 1px solid var(--border);">
+                    <iframe
+                        id="gpsMap"
+                        width="100%"
+                        height="200"
+                        frameborder="0"
+                        scrolling="no"
+                        style="display: block;"
+                        src="https://www.openstreetmap.org/export/embed.html?bbox=-4.6%2C54.18%2C-4.48%2C54.29&layer=mapnik&marker=54.2361%2C-4.5481">
+                    </iframe>
+                    <div style="font-size: 0.7rem; text-align: right; padding: 0.25rem 0.5rem; background: var(--bg-tertiary);">
+                        <a href="https://www.openstreetmap.org/?mlat=54.2361&mlon=-4.5481#map=12/54.2361/-4.5481" target="_blank" style="color: var(--text-secondary);">View larger map</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
     <footer>
-        <p>ESP32 Digital Compass with LSM303AGR + BME280 Sensors | v0.0.5 | <strong>DEMO MODE - Simulated Data</strong> | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
+        <p>ESP32 Digital Compass with LSM303AGR + BME280 + GPS | v0.0.5 | <strong>DEMO MODE - Simulated Data</strong> | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
     </footer>
 
     <script>
@@ -474,6 +531,17 @@
         const temperature = document.getElementById('temperature');
         const humidity = document.getElementById('humidity');
         const pressure = document.getElementById('pressure');
+        const latitude = document.getElementById('latitude');
+        const longitude = document.getElementById('longitude');
+        const altitude = document.getElementById('altitude');
+        const speed = document.getElementById('speed');
+        const satellites = document.getElementById('satellites');
+        const accuracy = document.getElementById('accuracy');
+        const gridSquare = document.getElementById('gridSquare');
+
+        // Base GPS coordinates (Isle of Man - IO74RE)
+        const baseLat = 54.2361;
+        const baseLon = -4.5481;
 
         // Simulate compass rotation
         let currentHeading = 0;
@@ -531,6 +599,22 @@
             temperature.textContent = `${tempVal.toFixed(1)}°C`;
             humidity.textContent = `${humidityVal.toFixed(1)}%`;
             pressure.textContent = `${pressureVal.toFixed(0)} hPa`;
+
+            // Simulate GPS readings (small drift around base position)
+            const latDrift = (Math.random() - 0.5) * 0.0001;
+            const lonDrift = (Math.random() - 0.5) * 0.0001;
+            const currentLat = baseLat + latDrift;
+            const currentLon = baseLon + lonDrift;
+
+            latitude.textContent = `${Math.abs(currentLat).toFixed(4)}°${currentLat >= 0 ? 'N' : 'S'}`;
+            longitude.textContent = `${Math.abs(currentLon).toFixed(4)}°${currentLon >= 0 ? 'E' : 'W'}`;
+            altitude.textContent = `${(127 + (Math.random() - 0.5) * 2).toFixed(0)}m`;
+            speed.textContent = `${(Math.random() * 0.5).toFixed(1)} km/h`;
+            satellites.textContent = `${8 + Math.floor(Math.random() * 4)}`;
+            accuracy.textContent = `${(2.5 + (Math.random() - 0.5) * 1).toFixed(1)}m`;
+
+            // Grid square stays constant for demo (IO74RE)
+            gridSquare.textContent = 'IO74RE';
         }
 
         // Show as connected
