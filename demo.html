@@ -413,17 +413,17 @@
 
                 <div class="grid-square" style="text-align: center; margin-bottom: 1rem;">
                     <div class="mag-axis-label">Maidenhead Grid Square</div>
-                    <div class="data-value" id="gridSquare" style="font-size: 2rem; letter-spacing: 0.1em;">IO74RE</div>
+                    <div class="data-value" id="gridSquare" style="font-size: 2rem; letter-spacing: 0.1em;">IO74RD</div>
                 </div>
 
                 <div class="mag-data">
                     <div class="mag-axis">
                         <div class="mag-axis-label">Latitude</div>
-                        <div class="mag-axis-value" id="latitude">54.2361°N</div>
+                        <div class="mag-axis-value" id="latitude">54.1744°N</div>
                     </div>
                     <div class="mag-axis">
                         <div class="mag-axis-label">Longitude</div>
-                        <div class="mag-axis-value" id="longitude">4.5481°W</div>
+                        <div class="mag-axis-value" id="longitude">4.5474°W</div>
                     </div>
                     <div class="mag-axis">
                         <div class="mag-axis-label">Satellites</div>
@@ -454,10 +454,10 @@
                         frameborder="0"
                         scrolling="no"
                         style="display: block;"
-                        src="https://www.openstreetmap.org/export/embed.html?bbox=-4.6%2C54.18%2C-4.48%2C54.29&layer=mapnik&marker=54.2361%2C-4.5481">
+                        src="https://www.openstreetmap.org/export/embed.html?bbox=-4.62%2C54.12%2C-4.48%2C54.22&layer=mapnik&marker=54.174447%2C-4.547421">
                     </iframe>
                     <div style="font-size: 0.7rem; text-align: right; padding: 0.25rem 0.5rem; background: var(--bg-tertiary);">
-                        <a href="https://www.openstreetmap.org/?mlat=54.2361&mlon=-4.5481#map=12/54.2361/-4.5481" target="_blank" style="color: var(--text-secondary);">View larger map</a>
+                        <a href="https://www.openstreetmap.org/?mlat=54.174447&mlon=-4.547421#map=13/54.174447/-4.547421" target="_blank" style="color: var(--text-secondary);">View larger map</a>
                     </div>
                 </div>
             </div>
@@ -539,9 +539,9 @@
         const accuracy = document.getElementById('accuracy');
         const gridSquare = document.getElementById('gridSquare');
 
-        // Base GPS coordinates (Isle of Man - IO74RE)
-        const baseLat = 54.2361;
-        const baseLon = -4.5481;
+        // Base GPS coordinates (Isle of Man - IO74RD)
+        const baseLat = 54.174447;
+        const baseLon = -4.547421;
 
         // Simulate compass rotation
         let currentHeading = 0;
@@ -613,8 +613,8 @@
             satellites.textContent = `${8 + Math.floor(Math.random() * 4)}`;
             accuracy.textContent = `${(2.5 + (Math.random() - 0.5) * 1).toFixed(1)}m`;
 
-            // Grid square stays constant for demo (IO74RE)
-            gridSquare.textContent = 'IO74RE';
+            // Grid square stays constant for demo (IO74RD)
+            gridSquare.textContent = 'IO74RD';
         }
 
         // Show as connected
