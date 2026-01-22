@@ -552,6 +552,15 @@
         let targetHeading = 0;
         let lastChangeTime = Date.now();
 
+        // Slower update timers for environmental and GPS data
+        let lastEnvUpdate = 0;
+        const envUpdateInterval = 5000; // Update environmental data every 5 seconds
+
+        // Current environmental values (stored between updates)
+        let currentTemp = 21.5;
+        let currentHumidity = 45.2;
+        let currentPressure = 1013;
+
         function getCardinalDirection(deg) {
             const directions = [
                 "N", "NNE", "NE", "ENE",
@@ -595,30 +604,27 @@
             magY.textContent = `${magYVal.toFixed(2)} µT`;
             magZ.textContent = `${magZVal.toFixed(2)} µT`;
 
-            // Simulate environmental readings (BME280)
-            const tempVal = 21.5 + (Math.random() - 0.5) * 0.5;
-            const humidityVal = 45 + (Math.random() - 0.5) * 2;
-            const pressureVal = 1013 + (Math.random() - 0.5) * 2;
+            // Simulate environmental readings (BME280) - update every 5 seconds
+            const now = Date.now();
+            if (now - lastEnvUpdate >= envUpdateInterval) {
+                lastEnvUpdate = now;
+                // Small realistic drift in environmental values
+                currentTemp += (Math.random() - 0.5) * 0.2;
+                currentHumidity += (Math.random() - 0.5) * 0.5;
+                currentPressure += (Math.random() - 0.5) * 0.5;
 
-            temperature.textContent = `${tempVal.toFixed(1)}°C`;
-            humidity.textContent = `${humidityVal.toFixed(1)}%`;
-            pressure.textContent = `${pressureVal.toFixed(0)} hPa`;
+                // Keep values in realistic ranges
+                currentTemp = Math.max(15, Math.min(30, currentTemp));
+                currentHumidity = Math.max(30, Math.min(70, currentHumidity));
+                currentPressure = Math.max(990, Math.min(1030, currentPressure));
 
-            // Simulate GPS readings (small drift around base position)
-            const latDrift = (Math.random() - 0.5) * 0.0001;
-            const lonDrift = (Math.random() - 0.5) * 0.0001;
-            const currentLat = baseLat + latDrift;
-            const currentLon = baseLon + lonDrift;
+                temperature.textContent = `${currentTemp.toFixed(1)}°C`;
+                humidity.textContent = `${currentHumidity.toFixed(1)}%`;
+                pressure.textContent = `${currentPressure.toFixed(0)} hPa`;
+            }
 
-            latitude.textContent = `${Math.abs(currentLat).toFixed(4)}°${currentLat >= 0 ? 'N' : 'S'}`;
-            longitude.textContent = `${Math.abs(currentLon).toFixed(4)}°${currentLon >= 0 ? 'E' : 'W'}`;
-            altitude.textContent = `${(127 + (Math.random() - 0.5) * 2).toFixed(0)}m`;
-            speed.textContent = `${(Math.random() * 0.5).toFixed(1)} km/h`;
-            satellites.textContent = `${8 + Math.floor(Math.random() * 4)}`;
-            accuracy.textContent = `${(2.5 + (Math.random() - 0.5) * 1).toFixed(1)}m`;
-
-            // Grid square stays constant for demo (IO74RE)
-            gridSquare.textContent = 'IO74RE';
+            // GPS data is static for demo (device is stationary)
+            // These values don't change - no jitter needed
         }
 
         // Show as connected
