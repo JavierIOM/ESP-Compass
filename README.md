@@ -1,6 +1,8 @@
 # ESP32 Digital Compass
 
-**Version 0.0.6** (Hardware Tested)
+**Version 1.0.0**
+
+> **Note:** The OLED display and GPS module features have been implemented but not yet hardware tested. The core compass functionality (LSM303AGR, BME280, calibration) is fully tested and working.
 
 A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. Optional support for BME280 (temperature/humidity/pressure), OLED display, and GPS module. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
@@ -67,6 +69,52 @@ The recommended cable has:
 - 150mm length (perfect for this project)
 
 ## Wiring
+
+### Complete System Diagram
+
+```
+                                    ┌─────────────────┐
+                                    │   GPS Module    │
+                                    │   (NEO-6M etc)  │
+                                    └────┬────────────┘
+                                         │ TX → GPIO16 (RX)
+                                         │ RX → GPIO17 (TX)
+                                         │ VCC → 3.3V
+                                         │ GND → GND
+                                         │
+┌─────────────────┐                      │
+│   OLED Display  │                      │
+│   (SSD1306)     │                      │
+└────┬────────────┘                      │
+     │ I2C (shared bus)                  │
+     │ SDA → GPIO21                      │
+     │ SCL → GPIO22                      │
+     │                                   │
+     │    ┌─────────────────┐            │
+     │    │     BME280      │            │
+     │    │ (Environmental) │            │
+     │    └────┬────────────┘            │
+     │         │ STEMMA QT              │
+     │         │                        │
+     │    ┌────▼────────────┐           │
+     │    │   LSM303AGR     │           │
+     │    │    (Compass)    │           │
+     │    └────┬────────────┘           │
+     │         │ STEMMA QT to Headers   │
+     │         │                        │
+     └─────────┼────────────────────────┘
+               │
+     ┌─────────▼──────────┐
+     │  FireBeetle ESP32  │
+     │                    │
+     │  GPIO21 (SDA) ←────┤ I2C Data
+     │  GPIO22 (SCL) ←────┤ I2C Clock
+     │  GPIO16 (RX) ←─────┤ GPS TX
+     │  GPIO17 (TX) ←─────┤ GPS RX
+     │  3.3V ←────────────┤ Power
+     │  GND ←─────────────┤ Ground
+     └────────────────────┘
+```
 
 ### No Soldering Required!
 
@@ -486,7 +534,12 @@ Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
 
-- **v0.0.6** (January 2025) - **Hardware Tested**
+- **v1.0.0** (January 2025) - **First Stable Release**
+  - Promoted to v1.0.0 stable release
+  - Core features fully tested: compass heading, calibration, BME280 environmental data
+  - Optional OLED and GPS features implemented but awaiting hardware testing
+
+- **v0.0.6** (January 2025)
   - **New Features:**
     - Optional 0.96" OLED display support (SSD1306, I2C)
     - Optional GPS module support (Serial, NMEA)
