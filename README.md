@@ -1,8 +1,8 @@
 # ESP32 Digital Compass
 
-**Version 0.0.5** (Hardware Tested)
+**Version 0.0.6** (Hardware Tested)
 
-A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. Optional BME280 sensor support for temperature, humidity, and pressure readings. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
+A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. Optional support for BME280 (temperature/humidity/pressure), OLED display, and GPS module. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
 
 ## Features
 
@@ -10,12 +10,15 @@ A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR 
 - 16-point cardinal direction display (N, NNE, NE, etc.)
 - Live magnetometer readings (X, Y, Z axes)
 - **Optional BME280 sensor** for temperature, humidity, and pressure
+- **Optional 0.96" OLED display** showing heading, direction, grid square, temperature, and WiFi info
+- **Optional GPS module** for location and Maidenhead grid square calculation
 - WebSocket-based real-time updates (10Hz)
 - Responsive web interface with animated compass needle
 - Dark/Light mode toggle (dark mode default)
 - Works on any device with a web browser
 - Ultra-low power consumption with battery support
 - Access Point mode - no existing WiFi network required (perfect for field use)
+- All optional sensors auto-detected - code works with any combination
 
 ## Screenshot
 
@@ -35,8 +38,14 @@ All parts available from **The Pi Hut** (UK):
 | USB Cable | USB Cable (Micro-USB or USB-C) | Included | Usually comes with board |
 | Environmental Sensor (Optional) | Adafruit BME280 with STEMMA QT (ID: 2652) | ~£15-18 | [The Pi Hut](https://thepihut.com/products/adafruit-bme280-i2c-or-spi-temperature-humidity-pressure-sensor) |
 | STEMMA QT Cable (Optional) | STEMMA QT to STEMMA QT Cable (100mm) | ~£1 | [The Pi Hut](https://thepihut.com/products/stemma-qt-qwiic-jst-sh-4-pin-cable-100mm-long) |
+| OLED Display (Optional) | 0.96" OLED Display Module (128x64, I2C) | ~£4 | [The Pi Hut](https://thepihut.com/products/0-96-oled-display-module-128x64) |
+| GPS Module (Optional) | GPS Module with Serial output | ~£15-25 | Various suppliers |
 
-**Total Cost: ~£17-21** (or ~£33-40 with optional BME280)
+**Total Cost: ~£17-21** (base) or with optional extras:
+- With BME280: ~£33-40
+- With OLED: ~£21-25
+- With GPS: ~£32-46
+- Fully loaded: ~£51-69
 
 ### Why FireBeetle ESP32?
 
@@ -124,6 +133,46 @@ The Adafruit BME280 has STEMMA QT connectors, so you can daisy-chain it with the
 **Daisy-chain connection:** Both sensors share the same I2C bus. The LSM303AGR has two STEMMA QT ports - plug the BME280 into the spare port using a short STEMMA QT cable.
 
 **Note:** The BME280 is optional. If not connected, the compass works normally without environmental data.
+
+### Optional: OLED Display
+
+The 0.96" OLED display uses I2C and shares the same bus as the other sensors.
+
+**Wiring (4 wires):**
+| OLED Pin | FireBeetle Pin |
+|----------|----------------|
+| VCC | 3.3V |
+| GND | GND |
+| SCL | GPIO 22 |
+| SDA | GPIO 21 |
+
+**Display shows:**
+- Large heading in degrees
+- Cardinal direction (N, NE, E, etc.)
+- Maidenhead grid square (when GPS connected) or "No GPS"
+- Temperature (when BME280 connected)
+- WiFi SSID and IP address
+
+### Optional: GPS Module
+
+Any GPS module with serial NMEA output (like NEO-6M, NEO-7M, or Adafruit Ultimate GPS) works.
+
+**Wiring:**
+| GPS Pin | FireBeetle Pin |
+|---------|----------------|
+| VCC | 3.3V or 5V |
+| GND | GND |
+| TX | GPIO 16 (RX) |
+| RX | GPIO 17 (TX) |
+
+**GPS provides:**
+- Latitude/Longitude
+- Altitude
+- Speed
+- Satellite count
+- Automatic Maidenhead grid square calculation (6-character locator)
+
+**Note:** GPS data is sent via WebSocket when available and displayed on the OLED (if connected).
 
 ## Software Requirements
 
@@ -437,6 +486,20 @@ Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
 
+- **v0.0.6** (January 2025) - **Hardware Tested**
+  - **New Features:**
+    - Optional 0.96" OLED display support (SSD1306, I2C)
+    - Optional GPS module support (Serial, NMEA)
+    - Automatic Maidenhead grid square calculation from GPS coordinates
+    - Display shows: heading, direction, grid square, temperature, WiFi info
+    - GPS data included in WebSocket JSON when available
+    - All optional hardware auto-detected at startup
+  - **Technical Details:**
+    - TinyGPS++ library for GPS parsing
+    - Adafruit SSD1306 library for OLED
+    - GPS on Serial2 (GPIO 16/17)
+    - Display updates at 4Hz to reduce flicker
+
 - **v0.0.5** (January 2025) - **Hardware Tested**
   - **New Features:**
     - Optional BME280 sensor support for temperature, humidity, and pressure
@@ -497,6 +560,9 @@ Managed automatically by PlatformIO (see `platformio.ini`):
 - Adafruit LSM303 Accel
 - Adafruit LIS2MDL
 - Adafruit BME280 Library
+- Adafruit SSD1306
+- Adafruit GFX Library
+- TinyGPSPlus
 - AsyncTCP (me-no-dev)
 - ESPAsyncWebServer (me-no-dev)
 

@@ -6,6 +6,8 @@
 #include <Adafruit_LSM303_Accel.h>
 #include <Adafruit_LIS2MDL.h>
 #include <Adafruit_BME280.h>
+#include <Adafruit_SSD1306.h>
+#include <TinyGPSPlus.h>
 #include <SPIFFS.h>
 #include <EEPROM.h>
 
@@ -21,13 +23,41 @@
 const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
 const char* ap_password = "compass123";     // Password (min 8 chars, or "" for open network)
 
+// OLED display configuration
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define OLED_I2C_ADDRESS 0x3C
+
+// GPS configuration (using Serial2)
+#define GPS_RX_PIN 16  // Connect GPS TX to this pin
+#define GPS_TX_PIN 17  // Connect GPS RX to this pin
+#define GPS_BAUD 9600
+
 // Create sensor objects
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
 Adafruit_LIS2MDL mag = Adafruit_LIS2MDL(12345);
 Adafruit_BME280 bme;
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+TinyGPSPlus gps;
 
-// BME280 status
+// Optional sensor status
 bool bmeAvailable = false;
+bool oledAvailable = false;
+bool gpsAvailable = false;
+
+// GPS data
+float gpsLatitude = 0.0;
+float gpsLongitude = 0.0;
+float gpsAltitude = 0.0;
+float gpsSpeed = 0.0;
+int gpsSatellites = 0;
+bool gpsHasFix = false;
+char gridSquare[7] = "------";  // 6-character Maidenhead locator + null
+
+// Display update timing (slower than sensor updates)
+unsigned long lastDisplayUpdate = 0;
+const unsigned long displayUpdateInterval = 250; // Update display 4 times per second
 
 // Web server on port 80
 AsyncWebServer server(80);
@@ -71,6 +101,9 @@ void saveCalibration();
 void startCalibration();
 void updateCalibration(float mx, float my, float mz);
 void finishCalibration();
+void updateDisplay(float heading, const String& direction, float temperature);
+void calculateGridSquare(float lat, float lon, char* grid);
+void processGPS();
 
 void setup() {
   Serial.begin(115200);
@@ -106,6 +139,27 @@ void setup() {
     bmeAvailable = false;
     Serial.println("BME280 not found - continuing without environmental data");
   }
+
+  // Try to initialize OLED display (optional)
+  if (display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS)) {
+    oledAvailable = true;
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println("ESP32 Compass");
+    display.println("Initializing...");
+    display.display();
+    Serial.println("OLED display found!");
+  } else {
+    oledAvailable = false;
+    Serial.println("OLED display not found - continuing without display");
+  }
+
+  // Try to initialize GPS (optional)
+  Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  // We'll check for GPS data in the loop - if we get valid data, gpsAvailable becomes true
+  Serial.println("GPS serial initialized (will detect if module connected)");
 
   // Load calibration from EEPROM
   loadCalibration();
@@ -147,6 +201,9 @@ void setup() {
 void loop() {
   // Clean up WebSocket clients
   ws.cleanupClients();
+
+  // Process GPS data if available
+  processGPS();
 
   // Check if calibration is complete
   if (calibrating && (millis() - calibrationStartTime >= calibrationDuration)) {
@@ -234,25 +291,46 @@ void loop() {
       if (calRemaining < 0) calRemaining = 0;
     }
 
-    // Send data to all connected WebSocket clients using pre-allocated buffer
+    // Read environmental data if available
+    float temperature = 0.0;
+    float humidity = 0.0;
+    float pressure = 0.0;
     if (bmeAvailable) {
-      float temperature = bme.readTemperature();
-      float humidity = bme.readHumidity();
-      float pressure = bme.readPressure() / 100.0F; // Convert to hPa
-
-      snprintf(jsonBuffer, sizeof(jsonBuffer),
-        "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d,\"temperature\":%.1f,\"humidity\":%.1f,\"pressure\":%.1f}",
-        heading, direction.c_str(), mag_x, mag_y, mag_z,
-        calibrating ? "true" : "false", calRemaining,
-        temperature, humidity, pressure);
-    } else {
-      snprintf(jsonBuffer, sizeof(jsonBuffer),
-        "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d}",
-        heading, direction.c_str(), mag_x, mag_y, mag_z,
-        calibrating ? "true" : "false", calRemaining);
+      temperature = bme.readTemperature();
+      humidity = bme.readHumidity();
+      pressure = bme.readPressure() / 100.0F; // Convert to hPa
     }
 
+    // Build JSON with all available data
+    int len = snprintf(jsonBuffer, sizeof(jsonBuffer),
+      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d",
+      heading, direction.c_str(), mag_x, mag_y, mag_z,
+      calibrating ? "true" : "false", calRemaining);
+
+    // Add environmental data if available
+    if (bmeAvailable) {
+      len += snprintf(jsonBuffer + len, sizeof(jsonBuffer) - len,
+        ",\"temperature\":%.1f,\"humidity\":%.1f,\"pressure\":%.1f",
+        temperature, humidity, pressure);
+    }
+
+    // Add GPS data if available
+    if (gpsAvailable && gpsHasFix) {
+      len += snprintf(jsonBuffer + len, sizeof(jsonBuffer) - len,
+        ",\"gps_lat\":%.6f,\"gps_lon\":%.6f,\"gps_alt\":%.1f,\"gps_speed\":%.1f,\"gps_sats\":%d,\"grid_square\":\"%s\"",
+        gpsLatitude, gpsLongitude, gpsAltitude, gpsSpeed, gpsSatellites, gridSquare);
+    }
+
+    // Close JSON object
+    snprintf(jsonBuffer + len, sizeof(jsonBuffer) - len, "}");
+
     ws.textAll(jsonBuffer);
+
+    // Update OLED display at slower rate
+    if (oledAvailable && (millis() - lastDisplayUpdate >= displayUpdateInterval)) {
+      lastDisplayUpdate = millis();
+      updateDisplay(heading, direction, temperature);
+    }
   }
 }
 
@@ -432,4 +510,122 @@ void finishCalibration() {
   Serial.printf("  Min X: %.2f, Max X: %.2f, Offset X: %.2f\n", magMinX, magMaxX, magOffsetX);
   Serial.printf("  Min Y: %.2f, Max Y: %.2f, Offset Y: %.2f\n", magMinY, magMaxY, magOffsetY);
   Serial.printf("  Min Z: %.2f, Max Z: %.2f, Offset Z: %.2f\n", magMinZ, magMaxZ, magOffsetZ);
+}
+
+// Process incoming GPS data
+void processGPS() {
+  while (Serial2.available() > 0) {
+    char c = Serial2.read();
+    if (gps.encode(c)) {
+      // We got valid GPS data - module is connected
+      if (!gpsAvailable) {
+        gpsAvailable = true;
+        Serial.println("GPS module detected!");
+      }
+
+      // Update GPS data if we have a valid fix
+      if (gps.location.isValid()) {
+        gpsHasFix = true;
+        gpsLatitude = gps.location.lat();
+        gpsLongitude = gps.location.lng();
+        calculateGridSquare(gpsLatitude, gpsLongitude, gridSquare);
+      }
+
+      if (gps.altitude.isValid()) {
+        gpsAltitude = gps.altitude.meters();
+      }
+
+      if (gps.speed.isValid()) {
+        gpsSpeed = gps.speed.kmph();
+      }
+
+      if (gps.satellites.isValid()) {
+        gpsSatellites = gps.satellites.value();
+      }
+    }
+  }
+}
+
+// Calculate 6-character Maidenhead grid square from lat/lon
+void calculateGridSquare(float lat, float lon, char* grid) {
+  // Maidenhead Locator System
+  // Field: 18 zones of 20 degrees longitude, 18 zones of 10 degrees latitude (A-R)
+  // Square: 10 zones each (0-9)
+  // Subsquare: 24 zones each (a-x)
+
+  // Normalize longitude to 0-360 and latitude to 0-180
+  lon += 180.0;
+  lat += 90.0;
+
+  // Field (first two characters)
+  grid[0] = 'A' + (int)(lon / 20.0);
+  grid[1] = 'A' + (int)(lat / 10.0);
+
+  // Square (next two characters)
+  lon = fmod(lon, 20.0);
+  lat = fmod(lat, 10.0);
+  grid[2] = '0' + (int)(lon / 2.0);
+  grid[3] = '0' + (int)(lat / 1.0);
+
+  // Subsquare (last two characters)
+  lon = fmod(lon, 2.0);
+  lat = fmod(lat, 1.0);
+  grid[4] = 'A' + (int)(lon / (2.0 / 24.0));
+  grid[5] = 'A' + (int)(lat / (1.0 / 24.0));
+
+  grid[6] = '\0';
+}
+
+// Update OLED display with current data
+void updateDisplay(float heading, const String& direction, float temperature) {
+  display.clearDisplay();
+
+  // Large heading at top (centered)
+  display.setTextSize(3);
+  char headingStr[8];
+  snprintf(headingStr, sizeof(headingStr), "%.1f", heading);
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(headingStr, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 0);
+  display.print(headingStr);
+  display.setTextSize(1);
+  display.print(" ");  // Small space before degree symbol
+
+  // Cardinal direction below heading
+  display.setTextSize(2);
+  display.getTextBounds(direction.c_str(), 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 26);
+  display.print(direction);
+
+  // Grid square and temperature on same line
+  display.setTextSize(1);
+  display.setCursor(0, 46);
+  if (gpsAvailable && gpsHasFix) {
+    display.print(gridSquare);
+  } else {
+    display.print("No GPS");
+  }
+
+  // Temperature on right side
+  if (bmeAvailable) {
+    char tempStr[10];
+    snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
+    display.getTextBounds(tempStr, 0, 0, &x1, &y1, &w, &h);
+    display.setCursor(SCREEN_WIDTH - w, 46);
+    display.print(tempStr);
+  }
+
+  // Network info at bottom
+  display.setCursor(0, 56);
+  display.print(ap_ssid);
+
+  // IP on right
+  IPAddress ip = WiFi.softAPIP();
+  String ipStr = ip.toString();
+  display.getTextBounds(ipStr.c_str(), 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, 56);
+  display.print(ipStr);
+
+  display.display();
 }
