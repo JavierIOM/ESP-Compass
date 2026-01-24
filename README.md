@@ -72,140 +72,70 @@ The recommended cable has:
 
 ### Complete System Diagram
 
-```
-                                    ┌─────────────────┐
-                                    │   GPS Module    │
-                                    │   (NEO-6M etc)  │
-                                    └────┬────────────┘
-                                         │ TX → GPIO16 (RX)
-                                         │ RX → GPIO17 (TX)
-                                         │ VCC → 3.3V
-                                         │ GND → GND
-                                         │
-┌─────────────────┐                      │
-│   OLED Display  │                      │
-│   (SSD1306)     │                      │
-└────┬────────────┘                      │
-     │ I2C (shared bus)                  │
-     │ SDA → GPIO21                      │
-     │ SCL → GPIO22                      │
-     │                                   │
-     │    ┌─────────────────┐            │
-     │    │     BME280      │            │
-     │    │ (Environmental) │            │
-     │    └────┬────────────┘            │
-     │         │ STEMMA QT              │
-     │         │                        │
-     │    ┌────▼────────────┐           │
-     │    │   LSM303AGR     │           │
-     │    │    (Compass)    │           │
-     │    └────┬────────────┘           │
-     │         │ STEMMA QT to Headers   │
-     │         │                        │
-     └─────────┼────────────────────────┘
-               │
-     ┌─────────▼──────────┐
-     │  FireBeetle ESP32  │
-     │                    │
-     │  GPIO21 (SDA) ←────┤ I2C Data
-     │  GPIO22 (SCL) ←────┤ I2C Clock
-     │  GPIO16 (RX) ←─────┤ GPS TX
-     │  GPIO17 (TX) ←─────┤ GPS RX
-     │  3.3V ←────────────┤ Power
-     │  GND ←─────────────┤ Ground
-     └────────────────────┘
-```
-
-### No Soldering Required!
-
-The LSM303AGR connects to the FireBeetle ESP32 using the STEMMA QT cable:
+All components connect to the FireBeetle ESP32. I2C devices (LSM303AGR, BME280, OLED) share the same bus. GPS uses serial.
 
 ```
-┌─────────────────┐
-│   LSM303AGR     │
-│  (Sensor Board) │
-└────┬────────────┘
-     │ STEMMA QT Port (JST-SH connector)
-     │
-     └─── STEMMA QT to Male Header Cable
-              │
-              ├─ Black  → GND
-              ├─ Red    → 3.3V (or V pin)
-              ├─ Blue   → GPIO21 (SDA)
-              └─ Yellow → GPIO22 (SCL)
-                    │
-          ┌─────────▼──────────┐
-          │  FireBeetle ESP32  │
-          │   Pin Headers      │
-          └────────────────────┘
+     ┌─────────────────┐      ┌─────────────────┐
+     │   GPS Module    │      │   OLED Display  │
+     │   (NEO-6M etc)  │      │   (SSD1306)     │
+     └────┬────────────┘      └────┬────────────┘
+          │ Serial (UART)          │ I2C
+          │                        │
+          │                        │    ┌─────────────────┐
+          │                        │    │     BME280      │
+          │                        │    │ (Environmental) │
+          │                        │    └────┬────────────┘
+          │                        │         │ STEMMA QT (I2C)
+          │                        │         │
+          │                        │    ┌────▼────────────┐
+          │                        │    │   LSM303AGR     │
+          │                        │    │   (Compass)     │
+          │                        │    └────┬────────────┘
+          │                        │         │ STEMMA QT to Headers
+          │                        │         │
+          │                        └─────────┤
+          │                                  │
+     ┌────▼──────────────────────────────────▼───┐
+     │           FireBeetle ESP32                │
+     │                                           │
+     │  I2C Bus:        Serial (GPS):            │
+     │  GPIO21 (SDA)    GPIO16 (RX) ← GPS TX     │
+     │  GPIO22 (SCL)    GPIO17 (TX) → GPS RX     │
+     │                                           │
+     │  Power: 3.3V and GND to all devices       │
+     └───────────────────────────────────────────┘
 ```
 
-### Pin Connections
+### Required: LSM303AGR Compass (No Soldering!)
 
-| LSM303AGR (Cable) | FireBeetle ESP32 Pin | Notes |
-|-------------------|----------------------|-------|
-| Black (GND) | GND | Ground |
-| Red (VIN) | 3.3V or V | Power supply |
-| Blue (SDA) | GPIO 21 (SDA) | I2C Data |
-| Yellow (SCL) | GPIO 22 (SCL) | I2C Clock |
+The LSM303AGR connects using a STEMMA QT to male header cable:
 
-**Note:** The LSM303AGR board has voltage regulation and works with both 3.3V and 5V input. The FireBeetle ESP32 GPIO pins are 3.3V logic level.
+| Cable Wire | FireBeetle Pin | Notes |
+|------------|----------------|-------|
+| Black | GND | Ground |
+| Red | 3.3V or V | Power |
+| Blue | GPIO 21 (SDA) | I2C Data |
+| Yellow | GPIO 22 (SCL) | I2C Clock |
 
 ### Optional: BME280 Environmental Sensor
 
-The Adafruit BME280 has STEMMA QT connectors, so you can daisy-chain it with the LSM303AGR - no extra wiring needed!
-
-```
-┌─────────────────┐
-│  FireBeetle     │
-│    ESP32        │
-└────┬────────────┘
-     │ Pin Headers (GND, 3.3V, SDA, SCL)
-     │
-     └─── STEMMA QT to Male Header Cable
-              │
-     ┌────────▼────────┐
-     │   LSM303AGR     │
-     │  (Compass)      │
-     └────┬────────────┘
-          │ Second STEMMA QT Port
-          │
-          └─── STEMMA QT to STEMMA QT Cable (100mm)
-                   │
-          ┌────────▼────────┐
-          │     BME280      │
-          │ (Environmental) │
-          └─────────────────┘
-```
-
-**Daisy-chain connection:** Both sensors share the same I2C bus. The LSM303AGR has two STEMMA QT ports - plug the BME280 into the spare port using a short STEMMA QT cable.
-
-**Note:** The BME280 is optional. If not connected, the compass works normally without environmental data.
+Daisy-chain to LSM303AGR using a STEMMA QT cable - the LSM303AGR has two ports. Same I2C bus, no extra wiring to ESP32.
 
 ### Optional: OLED Display
 
-The 0.96" OLED display uses I2C and shares the same bus as the other sensors.
-
-**Wiring (4 wires):**
 | OLED Pin | FireBeetle Pin |
 |----------|----------------|
 | VCC | 3.3V |
 | GND | GND |
-| SCL | GPIO 22 |
 | SDA | GPIO 21 |
+| SCL | GPIO 22 |
 
-**Display shows:**
-- Large heading in degrees
-- Cardinal direction (N, NE, E, etc.)
-- Maidenhead grid square (when GPS connected) or "No GPS"
-- Temperature (when BME280 connected)
-- WiFi SSID and IP address
+**Display shows:** heading, direction, grid square, temperature, WiFi info
 
 ### Optional: GPS Module
 
-Any GPS module with serial NMEA output (like NEO-6M, NEO-7M, or Adafruit Ultimate GPS) works.
+Any GPS with serial NMEA output (NEO-6M, NEO-7M, Adafruit Ultimate GPS).
 
-**Wiring:**
 | GPS Pin | FireBeetle Pin |
 |---------|----------------|
 | VCC | 3.3V or 5V |
@@ -213,14 +143,7 @@ Any GPS module with serial NMEA output (like NEO-6M, NEO-7M, or Adafruit Ultimat
 | TX | GPIO 16 (RX) |
 | RX | GPIO 17 (TX) |
 
-**GPS provides:**
-- Latitude/Longitude
-- Altitude
-- Speed
-- Satellite count
-- Automatic Maidenhead grid square calculation (6-character locator)
-
-**Note:** GPS data is sent via WebSocket when available and displayed on the OLED (if connected).
+**GPS provides:** location, altitude, speed, satellites, Maidenhead grid square
 
 ## Software Requirements
 
