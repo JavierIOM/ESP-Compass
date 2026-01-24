@@ -472,6 +472,27 @@
                 </div>
             </div>
 
+            <div class="gps-data" id="gpsPanel" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <div class="mag-axis-label">Grid Square</div>
+                    <div class="data-value" id="gridSquare" style="font-size: 1.75rem; letter-spacing: 0.1em;">------</div>
+                </div>
+                <div class="mag-data">
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Latitude</div>
+                        <div class="mag-axis-value" id="gpsLat">---</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Longitude</div>
+                        <div class="mag-axis-value" id="gpsLon">---</div>
+                    </div>
+                    <div class="mag-axis">
+                        <div class="mag-axis-label">Satellites</div>
+                        <div class="mag-axis-value" id="gpsSats">---</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="calibration-panel">
                 <div class="calibration-buttons">
                     <button class="btn btn-primary" id="calibrateBtn" onclick="startCalibration()">Calibrate</button>
@@ -559,6 +580,11 @@
         const temperature = document.getElementById('temperature');
         const humidity = document.getElementById('humidity');
         const pressure = document.getElementById('pressure');
+        const gpsPanel = document.getElementById('gpsPanel');
+        const gridSquare = document.getElementById('gridSquare');
+        const gpsLat = document.getElementById('gpsLat');
+        const gpsLon = document.getElementById('gpsLon');
+        const gpsSats = document.getElementById('gpsSats');
 
         let isCalibrating = false;
         let wasCalibrating = false;
@@ -617,6 +643,15 @@
                 temperature.textContent = `${data.temperature.toFixed(1)}°C`;
                 humidity.textContent = `${data.humidity.toFixed(1)}%`;
                 pressure.textContent = `${data.pressure.toFixed(0)} hPa`;
+            }
+
+            // Update GPS data if available
+            if (data.grid_square !== undefined) {
+                gpsPanel.style.display = 'block';
+                gridSquare.textContent = data.grid_square;
+                gpsLat.textContent = `${data.gps_lat.toFixed(4)}`;
+                gpsLon.textContent = `${data.gps_lon.toFixed(4)}`;
+                gpsSats.textContent = data.gps_sats;
             }
 
             // Update calibration UI

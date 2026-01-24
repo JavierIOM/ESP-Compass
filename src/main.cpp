@@ -418,8 +418,12 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     // Handle incoming data (calibration commands)
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-      data[len] = 0; // Null terminate
-      String msg = (char*)data;
+      // Copy data to a properly sized buffer for null termination
+      char msgBuffer[64];
+      size_t copyLen = len < sizeof(msgBuffer) - 1 ? len : sizeof(msgBuffer) - 1;
+      memcpy(msgBuffer, data, copyLen);
+      msgBuffer[copyLen] = '\0';
+      String msg = msgBuffer;
 
       if (msg.indexOf("startCal") >= 0) {
         startCalibration();
@@ -445,10 +449,25 @@ void loadCalibration() {
     EEPROM.get(EEPROM_OFFSET_X_ADDR, magOffsetX);
     EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
     EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
-    Serial.println("Calibration loaded from EEPROM:");
-    Serial.printf("  Offset X: %.2f\n", magOffsetX);
-    Serial.printf("  Offset Y: %.2f\n", magOffsetY);
-    Serial.printf("  Offset Z: %.2f\n", magOffsetZ);
+
+    // Sanity check: typical magnetometer offsets should be within +/- 200 µT
+    // If values are NaN, Inf, or out of range, reset to zero
+    bool valid = true;
+    if (isnan(magOffsetX) || isinf(magOffsetX) || fabs(magOffsetX) > 200.0) valid = false;
+    if (isnan(magOffsetY) || isinf(magOffsetY) || fabs(magOffsetY) > 200.0) valid = false;
+    if (isnan(magOffsetZ) || isinf(magOffsetZ) || fabs(magOffsetZ) > 200.0) valid = false;
+
+    if (valid) {
+      Serial.println("Calibration loaded from EEPROM:");
+      Serial.printf("  Offset X: %.2f\n", magOffsetX);
+      Serial.printf("  Offset Y: %.2f\n", magOffsetY);
+      Serial.printf("  Offset Z: %.2f\n", magOffsetZ);
+    } else {
+      Serial.println("EEPROM calibration data invalid - resetting to zero");
+      magOffsetX = 0.0;
+      magOffsetY = 0.0;
+      magOffsetZ = 0.0;
+    }
   } else {
     Serial.println("No calibration data found in EEPROM");
     magOffsetX = 0.0;
@@ -523,12 +542,15 @@ void processGPS() {
         Serial.println("GPS module detected!");
       }
 
-      // Update GPS data if we have a valid fix
+      // Update GPS fix status based on current validity
       if (gps.location.isValid()) {
         gpsHasFix = true;
         gpsLatitude = gps.location.lat();
         gpsLongitude = gps.location.lng();
         calculateGridSquare(gpsLatitude, gpsLongitude, gridSquare);
+      } else {
+        // Lost GPS fix
+        gpsHasFix = false;
       }
 
       if (gps.altitude.isValid()) {
@@ -567,11 +589,16 @@ void calculateGridSquare(float lat, float lon, char* grid) {
   grid[2] = '0' + (int)(lon / 2.0);
   grid[3] = '0' + (int)(lat / 1.0);
 
-  // Subsquare (last two characters)
+  // Subsquare (last two characters) - lowercase a-x per Maidenhead standard
   lon = fmod(lon, 2.0);
   lat = fmod(lat, 1.0);
-  grid[4] = 'A' + (int)(lon / (2.0 / 24.0));
-  grid[5] = 'A' + (int)(lat / (1.0 / 24.0));
+  int subLon = (int)(lon * 12.0);  // 24 divisions over 2 degrees
+  int subLat = (int)(lat * 24.0);  // 24 divisions over 1 degree
+  // Clamp to valid range 0-23 (handles boundary case at exactly 2.0 or 1.0)
+  if (subLon > 23) subLon = 23;
+  if (subLat > 23) subLat = 23;
+  grid[4] = 'a' + subLon;
+  grid[5] = 'a' + subLat;
 
   grid[6] = '\0';
 }

@@ -222,7 +222,7 @@ A custom 3D printable case is included in the `case/` folder.
 
 ### 1. Configure Access Point (Optional)
 
-The ESP32 creates its own WiFi network. You can customize the name and password by editing `src/main.cpp` lines 12-13:
+The ESP32 creates its own WiFi network. You can customize the name and password by editing `src/main.cpp` lines 22-24:
 
 ```cpp
 const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
@@ -441,7 +441,7 @@ The FireBeetle ESP32 has excellent battery support:
 
 ### Change Update Rate
 
-In `src/main.cpp`, line 25:
+In `src/main.cpp`, line 68:
 ```cpp
 const unsigned long updateInterval = 100; // milliseconds
 
