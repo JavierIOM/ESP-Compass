@@ -345,7 +345,7 @@ The FireBeetle ESP32 has excellent battery support:
 ## Web Interface Features
 
 ### Compass Display
-- **Animated compass rose** with 60 degree marks
+- **Animated compass rose** with 45 degree marks
 - **Cardinal directions** (N, E, S, W) highlighted in red
 - **Red needle** points to magnetic north
 - **Smooth rotation** with CSS transitions
@@ -429,12 +429,22 @@ The FireBeetle ESP32 has excellent battery support:
     "mag_x": 23.45,
     "mag_y": -12.34,
     "mag_z": 45.67,
+    "calibrating": false,
+    "calRemaining": 0,
     "temperature": 22.5,
     "humidity": 45.2,
-    "pressure": 1013.25
+    "pressure": 1013.25,
+    "gps_has_fix": true,
+    "gps_lat": 54.1234,
+    "gps_lon": -4.5678,
+    "gps_sats": 8,
+    "gps_alt": 125.5,
+    "gps_speed": 0.0,
+    "grid_square": "IO74re"
   }
   ```
 - Environmental data (temperature, humidity, pressure) only included when BME280 is connected
+- GPS data (gps_*, grid_square) only included when GPS module is connected and has valid fix
 - Update frequency: 10Hz (100ms intervals)
 
 ## Customization

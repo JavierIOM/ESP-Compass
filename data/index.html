@@ -502,7 +502,7 @@
                     </div>
                     <div class="mag-axis">
                         <div class="mag-axis-label">Fix</div>
-                        <div class="mag-axis-value" id="gpsFix" style="color: var(--success);">3D</div>
+                        <div class="mag-axis-value" id="gpsFix">---</div>
                     </div>
                 </div>
             </div>
@@ -601,6 +601,7 @@
         const gpsSats = document.getElementById('gpsSats');
         const gpsAlt = document.getElementById('gpsAlt');
         const gpsSpeed = document.getElementById('gpsSpeed');
+        const gpsFix = document.getElementById('gpsFix');
 
         let isCalibrating = false;
         let wasCalibrating = false;
@@ -640,6 +641,12 @@
         }
 
         function updateCompass(data) {
+            // Validate required data fields
+            if (data.heading === undefined || data.direction === undefined) {
+                console.warn('Missing required compass data');
+                return;
+            }
+
             // Update needle rotation (keep centered with translate)
             needle.style.transform = `translate(-50%, -50%) rotate(${data.heading}deg)`;
 
@@ -648,38 +655,69 @@
             headingDegrees.textContent = `${data.heading.toFixed(1)}°`;
             direction.textContent = data.direction;
 
-            // Update magnetometer data
-            magX.textContent = `${data.mag_x.toFixed(2)} µT`;
-            magY.textContent = `${data.mag_y.toFixed(2)} µT`;
-            magZ.textContent = `${data.mag_z.toFixed(2)} µT`;
+            // Update magnetometer data (with null checks)
+            if (data.mag_x !== undefined && data.mag_y !== undefined && data.mag_z !== undefined) {
+                magX.textContent = `${data.mag_x.toFixed(2)} µT`;
+                magY.textContent = `${data.mag_y.toFixed(2)} µT`;
+                magZ.textContent = `${data.mag_z.toFixed(2)} µT`;
+            }
 
             // Update environmental data if available
-            if (data.temperature !== undefined) {
+            if (data.temperature !== undefined && data.humidity !== undefined && data.pressure !== undefined) {
                 envPanel.style.display = 'block';
                 temperature.textContent = `${data.temperature.toFixed(1)}°C`;
                 humidity.textContent = `${data.humidity.toFixed(1)}%`;
                 pressure.textContent = `${data.pressure.toFixed(0)} hPa`;
             }
 
-            // Update GPS data if available
-            if (data.grid_square !== undefined) {
+            // Update GPS data if available (with coordinate validation)
+            if (data.gps_has_fix !== undefined) {
                 gpsPanel.style.display = 'block';
-                gridSquare.textContent = data.grid_square;
-                gpsLat.textContent = `${data.gps_lat.toFixed(4)}`;
-                gpsLon.textContent = `${data.gps_lon.toFixed(4)}`;
-                gpsSats.textContent = data.gps_sats;
-                gpsAlt.textContent = `${data.gps_alt.toFixed(0)}m`;
-                gpsSpeed.textContent = `${data.gps_speed.toFixed(1)} km/h`;
+
+                // Update fix indicator based on actual fix status
+                if (data.gps_has_fix) {
+                    gpsFix.textContent = data.gps_sats >= 4 ? '3D' : '2D';
+                    gpsFix.style.color = 'var(--success)';
+                } else {
+                    gpsFix.textContent = 'No Fix';
+                    gpsFix.style.color = 'var(--accent)';
+                }
+
+                // Only show valid coordinates
+                if (data.gps_has_fix && data.gps_lat !== undefined && data.gps_lon !== undefined) {
+                    // Validate coordinate ranges
+                    const lat = data.gps_lat;
+                    const lon = data.gps_lon;
+                    if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                        gridSquare.textContent = data.grid_square || '------';
+                        gpsLat.textContent = `${lat.toFixed(4)}`;
+                        gpsLon.textContent = `${lon.toFixed(4)}`;
+                        gpsSats.textContent = data.gps_sats !== undefined ? data.gps_sats : '---';
+                        gpsAlt.textContent = data.gps_alt !== undefined ? `${data.gps_alt.toFixed(0)}m` : '---';
+                        gpsSpeed.textContent = data.gps_speed !== undefined ? `${data.gps_speed.toFixed(1)} km/h` : '---';
+                    }
+                } else {
+                    gridSquare.textContent = '------';
+                    gpsLat.textContent = '---';
+                    gpsLon.textContent = '---';
+                    gpsSats.textContent = data.gps_sats !== undefined ? data.gps_sats : '---';
+                    gpsAlt.textContent = '---';
+                    gpsSpeed.textContent = '---';
+                }
             }
 
             // Update calibration UI
-            isCalibrating = data.calibrating;
+            isCalibrating = data.calibrating === true;
             if (isCalibrating) {
                 calibrateBtn.disabled = true;
                 calibrateBtn.textContent = 'Calibrating...';
                 clearCalBtn.disabled = true;
                 calibrationStatus.classList.add('active');
-                countdown.textContent = data.calRemaining;
+                // Re-query countdown element in case it was recreated
+                const countdownEl = document.getElementById('countdown');
+                if (countdownEl && data.calRemaining !== undefined) {
+                    countdownEl.textContent = data.calRemaining;
+                }
                 wasCalibrating = true;
             } else {
                 calibrateBtn.disabled = false;
