@@ -548,7 +548,7 @@ void processGPS() {
         gpsLatitude = GPS.latitudeDegrees;
         gpsLongitude = GPS.longitudeDegrees;
         gpsAltitude = GPS.altitude;
-        gpsSpeed = GPS.speed * 1.852; // Convert knots to km/h
+        gpsSpeed = GPS.speed * 1.15078; // Convert knots to mph
         gpsSatellites = (int)GPS.satellites;
         calculateGridSquare(gpsLatitude, gpsLongitude, gridSquare);
       } else {

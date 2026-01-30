@@ -694,7 +694,7 @@
                         gpsLon.textContent = `${lon.toFixed(4)}`;
                         gpsSats.textContent = data.gps_sats !== undefined ? data.gps_sats : '---';
                         gpsAlt.textContent = data.gps_alt !== undefined ? `${data.gps_alt.toFixed(0)}m` : '---';
-                        gpsSpeed.textContent = data.gps_speed !== undefined ? `${data.gps_speed.toFixed(1)} km/h` : '---';
+                        gpsSpeed.textContent = data.gps_speed !== undefined ? `${data.gps_speed.toFixed(1)} mph` : '---';
                     }
                 } else {
                     gridSquare.textContent = '------';
