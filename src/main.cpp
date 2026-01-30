@@ -52,6 +52,12 @@ float gpsSpeed = 0.0;
 int gpsSatellites = 0;
 bool gpsHasFix = false;
 char gridSquare[7] = "------";  // 6-character Maidenhead locator + null
+float gpsHDOP = 0.0;
+float gpsVDOP = 0.0;
+float gpsPDOP = 0.0;
+uint8_t gpsFixQuality = 0;
+char gpsTime[9] = "--:--:--";   // HH:MM:SS
+char gpsDate[11] = "----/--/--"; // YYYY/MM/DD
 
 // Display update timing (slower than sensor updates)
 unsigned long lastDisplayUpdate = 0;
@@ -161,7 +167,7 @@ void setup() {
   // Try to initialize GPS via I2C (optional - Adafruit Mini GPS PA1010D)
   if (GPS.begin(GPS_I2C_ADDRESS)) {
     gpsAvailable = true;
-    GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);  // RMC + GGA sentences
+    GPS.sendCommand("$PMTK314,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29");  // RMC + GGA + GSA sentences
     GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);       // 1Hz update rate
     Serial.println("GPS module found on I2C!");
   } else {
@@ -317,8 +323,10 @@ void loop() {
         gpsHasFix ? "true" : "false", gpsSatellites);
       if (gpsHasFix) {
         len += snprintf(jsonBuffer + len, sizeof(jsonBuffer) - len,
-          ",\"gps_lat\":%.6f,\"gps_lon\":%.6f,\"gps_alt\":%.1f,\"gps_speed\":%.1f,\"grid_square\":\"%s\"",
-          gpsLatitude, gpsLongitude, gpsAltitude, gpsSpeed, gridSquare);
+          ",\"gps_lat\":%.6f,\"gps_lon\":%.6f,\"gps_alt\":%.1f,\"gps_speed\":%.1f,\"grid_square\":\"%s\""
+          ",\"gps_hdop\":%.1f,\"gps_vdop\":%.1f,\"gps_pdop\":%.1f,\"gps_fix_quality\":%d,\"gps_time\":\"%s\",\"gps_date\":\"%s\"",
+          gpsLatitude, gpsLongitude, gpsAltitude, gpsSpeed, gridSquare,
+          gpsHDOP, gpsVDOP, gpsPDOP, gpsFixQuality, gpsTime, gpsDate);
       }
     }
 
@@ -550,6 +558,12 @@ void processGPS() {
         gpsAltitude = GPS.altitude;
         gpsSpeed = GPS.speed * 1.15078; // Convert knots to mph
         gpsSatellites = (int)GPS.satellites;
+        gpsHDOP = GPS.HDOP;
+        gpsVDOP = GPS.VDOP;
+        gpsPDOP = GPS.PDOP;
+        gpsFixQuality = GPS.fixquality;
+        snprintf(gpsTime, sizeof(gpsTime), "%02d:%02d:%02d", GPS.hour, GPS.minute, GPS.seconds);
+        snprintf(gpsDate, sizeof(gpsDate), "20%02d/%02d/%02d", GPS.year, GPS.month, GPS.day);
         calculateGridSquare(gpsLatitude, gpsLongitude, gridSquare);
       } else {
         gpsHasFix = false;

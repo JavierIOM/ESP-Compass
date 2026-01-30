@@ -505,6 +505,39 @@
                         <div class="mag-axis-value" id="gpsFix">---</div>
                     </div>
                 </div>
+                <div style="text-align: center; margin-top: 0.75rem;">
+                    <button class="btn btn-secondary" id="gpsDetailToggle" onclick="toggleGpsDetails()" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Show Details</button>
+                </div>
+                <div id="gpsDetailPanel" style="display: none; margin-top: 0.75rem;">
+                    <div class="mag-data">
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">UTC Time</div>
+                            <div class="mag-axis-value" id="gpsUtcTime">---</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">UTC Date</div>
+                            <div class="mag-axis-value" id="gpsUtcDate">---</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">Fix Quality</div>
+                            <div class="mag-axis-value" id="gpsFixQuality">---</div>
+                        </div>
+                    </div>
+                    <div class="mag-data" style="margin-top: 0.5rem;">
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">HDOP</div>
+                            <div class="mag-axis-value" id="gpsHdop">---</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">VDOP</div>
+                            <div class="mag-axis-value" id="gpsVdop">---</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">PDOP</div>
+                            <div class="mag-axis-value" id="gpsPdop">---</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="calibration-panel">
@@ -602,6 +635,12 @@
         const gpsAlt = document.getElementById('gpsAlt');
         const gpsSpeed = document.getElementById('gpsSpeed');
         const gpsFix = document.getElementById('gpsFix');
+        const gpsUtcTime = document.getElementById('gpsUtcTime');
+        const gpsUtcDate = document.getElementById('gpsUtcDate');
+        const gpsFixQuality = document.getElementById('gpsFixQuality');
+        const gpsHdop = document.getElementById('gpsHdop');
+        const gpsVdop = document.getElementById('gpsVdop');
+        const gpsPdop = document.getElementById('gpsPdop');
 
         let isCalibrating = false;
         let wasCalibrating = false;
@@ -695,6 +734,14 @@
                         gpsSats.textContent = data.gps_sats !== undefined ? data.gps_sats : '---';
                         gpsAlt.textContent = data.gps_alt !== undefined ? `${data.gps_alt.toFixed(0)}m` : '---';
                         gpsSpeed.textContent = data.gps_speed !== undefined ? `${data.gps_speed.toFixed(1)} mph` : '---';
+                        // Detail fields
+                        gpsUtcTime.textContent = data.gps_time || '---';
+                        gpsUtcDate.textContent = data.gps_date || '---';
+                        const fqLabels = ['None', 'GPS', 'DGPS'];
+                        gpsFixQuality.textContent = data.gps_fix_quality !== undefined ? (fqLabels[data.gps_fix_quality] || data.gps_fix_quality) : '---';
+                        gpsHdop.textContent = data.gps_hdop !== undefined ? data.gps_hdop.toFixed(1) : '---';
+                        gpsVdop.textContent = data.gps_vdop !== undefined ? data.gps_vdop.toFixed(1) : '---';
+                        gpsPdop.textContent = data.gps_pdop !== undefined ? data.gps_pdop.toFixed(1) : '---';
                     }
                 } else {
                     gridSquare.textContent = '------';
@@ -703,6 +750,12 @@
                     gpsSats.textContent = data.gps_sats !== undefined ? data.gps_sats : '---';
                     gpsAlt.textContent = '---';
                     gpsSpeed.textContent = '---';
+                    gpsUtcTime.textContent = '---';
+                    gpsUtcDate.textContent = '---';
+                    gpsFixQuality.textContent = '---';
+                    gpsHdop.textContent = '---';
+                    gpsVdop.textContent = '---';
+                    gpsPdop.textContent = '---';
                 }
             }
 
@@ -737,6 +790,18 @@
                     }, 2000);
                     wasCalibrating = false;
                 }
+            }
+        }
+
+        function toggleGpsDetails() {
+            const panel = document.getElementById('gpsDetailPanel');
+            const btn = document.getElementById('gpsDetailToggle');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.textContent = 'Hide Details';
+            } else {
+                panel.style.display = 'none';
+                btn.textContent = 'Show Details';
             }
         }
 

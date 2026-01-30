@@ -449,6 +449,39 @@
                         <div class="mag-axis-value" id="accuracy">2.5m</div>
                     </div>
                 </div>
+                <div style="text-align: center; margin-top: 0.75rem;">
+                    <button class="btn btn-secondary" id="gpsDetailToggle" onclick="toggleGpsDetails()" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Show Details</button>
+                </div>
+                <div id="gpsDetailPanel" style="display: none; margin-top: 0.75rem;">
+                    <div class="mag-data">
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">UTC Time</div>
+                            <div class="mag-axis-value">14:32:07</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">UTC Date</div>
+                            <div class="mag-axis-value">2025/01/30</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">Fix Quality</div>
+                            <div class="mag-axis-value">GPS</div>
+                        </div>
+                    </div>
+                    <div class="mag-data" style="margin-top: 0.5rem;">
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">HDOP</div>
+                            <div class="mag-axis-value">1.2</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">VDOP</div>
+                            <div class="mag-axis-value">1.8</div>
+                        </div>
+                        <div class="mag-axis">
+                            <div class="mag-axis-label">PDOP</div>
+                            <div class="mag-axis-value">2.1</div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="map-container" style="margin-top: 1rem; border-radius: 0.5rem; overflow: hidden; border: 1px solid var(--border);">
                     <iframe
@@ -632,6 +665,18 @@
 
         // Update compass at 10Hz
         setInterval(updateCompass, 100);
+
+        function toggleGpsDetails() {
+            const panel = document.getElementById('gpsDetailPanel');
+            const btn = document.getElementById('gpsDetailToggle');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.textContent = 'Hide Details';
+            } else {
+                panel.style.display = 'none';
+                btn.textContent = 'Show Details';
+            }
+        }
 
         console.log('Demo mode active - simulating compass rotation');
     </script>
