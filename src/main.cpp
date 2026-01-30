@@ -226,18 +226,6 @@ void loop() {
     float raw_mag_y = mag_event.magnetic.y;
     float raw_mag_z = mag_event.magnetic.z;
 
-    // Debug output - print raw sensor data every second
-    static unsigned long lastDebugPrint = 0;
-    if (millis() - lastDebugPrint >= 1000) {
-      lastDebugPrint = millis();
-      Serial.println("--- RAW SENSOR DATA ---");
-      Serial.printf("Accel: X=%.2f Y=%.2f Z=%.2f m/s²\n",
-        accel_event.acceleration.x, accel_event.acceleration.y, accel_event.acceleration.z);
-      Serial.printf("Mag Raw: X=%.2f Y=%.2f Z=%.2f µT\n", raw_mag_x, raw_mag_y, raw_mag_z);
-      Serial.printf("Mag Cal: X=%.2f Y=%.2f Z=%.2f µT (offsets: %.2f, %.2f, %.2f)\n",
-        raw_mag_x - magOffsetX, raw_mag_y - magOffsetY, raw_mag_z - magOffsetZ,
-        magOffsetX, magOffsetY, magOffsetZ);
-    }
 
     // Update calibration if in progress (use raw values)
     if (calibrating) {
