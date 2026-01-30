@@ -141,7 +141,11 @@ void setup() {
   }
 
   // Try to initialize OLED display (optional)
-  if (display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS)) {
+  // First do an I2C scan to verify a device is actually present at 0x3C
+  // (display.begin() can return true even with no device connected)
+  Wire.beginTransmission(OLED_I2C_ADDRESS);
+  bool oledOnBus = (Wire.endTransmission() == 0);
+  if (oledOnBus && display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS)) {
     oledAvailable = true;
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
