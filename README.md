@@ -41,7 +41,7 @@ All parts available from **The Pi Hut** (UK):
 | Environmental Sensor (Optional) | Adafruit BME280 with STEMMA QT (ID: 2652) | ~£15-18 | [The Pi Hut](https://thepihut.com/products/adafruit-bme280-i2c-or-spi-temperature-humidity-pressure-sensor) |
 | STEMMA QT Cable (Optional) | STEMMA QT to STEMMA QT Cable (100mm) | ~£1 | [The Pi Hut](https://thepihut.com/products/stemma-qt-qwiic-jst-sh-4-pin-cable-100mm-long) |
 | OLED Display (Optional) | 0.96" OLED Display Module (128x64, I2C) | ~£4 | [The Pi Hut](https://thepihut.com/products/0-96-oled-display-module-128x64) |
-| GPS Module (Optional) | GPS Module with Serial output | ~£15-25 | Various suppliers |
+| GPS Module (Optional) | Adafruit Mini GPS PA1010D (STEMMA QT) | ~£30 | [The Pi Hut](https://thepihut.com/products/adafruit-mini-gps-pa1010d-uart-and-i2c-stemma-qt) |
 
 **Total Cost: ~£17-21** (base) or with optional extras:
 - With BME280: ~£33-40
@@ -72,14 +72,14 @@ The recommended cable has:
 
 ### Complete System Diagram
 
-All components connect to the FireBeetle ESP32. I2C devices (LSM303AGR, BME280, OLED) share the same bus. GPS uses serial.
+All components connect to the FireBeetle ESP32 via I2C. STEMMA QT / Qwiic cables make wiring simple - no soldering required for most connections.
 
 ```
      ┌─────────────────┐      ┌─────────────────┐
-     │   GPS Module    │      │   OLED Display  │
-     │   (NEO-6M etc)  │      │   (SSD1306)     │
+     │  GPS Module     │      │   OLED Display  │
+     │  (PA1010D)      │      │   (SSD1306)     │
      └────┬────────────┘      └────┬────────────┘
-          │ Serial (UART)          │ I2C
+          │ STEMMA QT (I2C)        │ I2C
           │                        │
           │                        │    ┌─────────────────┐
           │                        │    │     BME280      │
@@ -93,14 +93,14 @@ All components connect to the FireBeetle ESP32. I2C devices (LSM303AGR, BME280, 
           │                        │    └────┬────────────┘
           │                        │         │ STEMMA QT to Headers
           │                        │         │
-          │                        └─────────┤
-          │                                  │
-     ┌────▼──────────────────────────────────▼───┐
+          └────────────────────────┼─────────┤
+                                   │         │
+     ┌─────────────────────────────▼─────────▼───┐
      │           FireBeetle ESP32                │
      │                                           │
-     │  I2C Bus:        Serial (GPS):            │
-     │  GPIO21 (SDA)    GPIO16 (RX) ← GPS TX     │
-     │  GPIO22 (SCL)    GPIO17 (TX) → GPS RX     │
+     │  I2C Bus (shared by all devices):         │
+     │  GPIO21 (SDA)                             │
+     │  GPIO22 (SCL)                             │
      │                                           │
      │  Power: 3.3V and GND to all devices       │
      └───────────────────────────────────────────┘
@@ -134,14 +134,7 @@ Daisy-chain to LSM303AGR using a STEMMA QT cable - the LSM303AGR has two ports. 
 
 ### Optional: GPS Module
 
-Any GPS with serial NMEA output (NEO-6M, NEO-7M, Adafruit Ultimate GPS).
-
-| GPS Pin | FireBeetle Pin |
-|---------|----------------|
-| VCC | 3.3V or 5V |
-| GND | GND |
-| TX | GPIO 16 (RX) |
-| RX | GPIO 17 (TX) |
+Uses Adafruit Mini GPS PA1010D with STEMMA QT (I2C). Daisy-chain to the LSM303AGR or BME280 using a STEMMA QT cable - same I2C bus, no extra wiring to ESP32.
 
 **GPS provides:** location, altitude, speed, satellites, Maidenhead grid square
 
@@ -483,7 +476,7 @@ Edit `data/index.html` CSS variables to customize colors and styling.
   - **Technical Details:**
     - TinyGPS++ library for GPS parsing
     - Adafruit SSD1306 library for OLED
-    - GPS on Serial2 (GPIO 16/17)
+    - GPS on I2C (Adafruit Mini GPS PA1010D at 0x10)
     - Display updates at 4Hz to reduce flicker
 
 - **v0.0.5** (January 2025) - **Hardware Tested**
@@ -548,7 +541,7 @@ Managed automatically by PlatformIO (see `platformio.ini`):
 - Adafruit BME280 Library
 - Adafruit SSD1306
 - Adafruit GFX Library
-- TinyGPSPlus
+- Adafruit GPS Library
 - AsyncTCP (me-no-dev)
 - ESPAsyncWebServer (me-no-dev)
 

@@ -7,7 +7,7 @@
 #include <Adafruit_LIS2MDL.h>
 #include <Adafruit_BME280.h>
 #include <Adafruit_SSD1306.h>
-#include <TinyGPSPlus.h>
+#include <Adafruit_GPS.h>
 #include <SPIFFS.h>
 #include <EEPROM.h>
 
@@ -29,17 +29,15 @@ const char* ap_password = "compass123";     // Password (min 8 chars, or "" for 
 #define OLED_RESET -1
 #define OLED_I2C_ADDRESS 0x3C
 
-// GPS configuration (using Serial2)
-#define GPS_RX_PIN 16  // Connect GPS TX to this pin
-#define GPS_TX_PIN 17  // Connect GPS RX to this pin
-#define GPS_BAUD 9600
+// GPS configuration (I2C via STEMMA QT)
+#define GPS_I2C_ADDRESS 0x10
 
 // Create sensor objects
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(54321);
 Adafruit_LIS2MDL mag = Adafruit_LIS2MDL(12345);
 Adafruit_BME280 bme;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-TinyGPSPlus gps;
+Adafruit_GPS GPS(&Wire);
 
 // Optional sensor status
 bool bmeAvailable = false;
@@ -160,10 +158,16 @@ void setup() {
     Serial.println("OLED display not found - continuing without display");
   }
 
-  // Try to initialize GPS (optional)
-  Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
-  // We'll check for GPS data in the loop - if we get valid data, gpsAvailable becomes true
-  Serial.println("GPS serial initialized (will detect if module connected)");
+  // Try to initialize GPS via I2C (optional - Adafruit Mini GPS PA1010D)
+  if (GPS.begin(GPS_I2C_ADDRESS)) {
+    gpsAvailable = true;
+    GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);  // RMC + GGA sentences
+    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);       // 1Hz update rate
+    Serial.println("GPS module found on I2C!");
+  } else {
+    gpsAvailable = false;
+    Serial.println("GPS module not found - continuing without GPS");
+  }
 
   // Load calibration from EEPROM
   loadCalibration();
@@ -306,11 +310,16 @@ void loop() {
         temperature, humidity, pressure);
     }
 
-    // Add GPS data if available
-    if (gpsAvailable && gpsHasFix) {
+    // Add GPS data if module is available
+    if (gpsAvailable) {
       len += snprintf(jsonBuffer + len, sizeof(jsonBuffer) - len,
-        ",\"gps_lat\":%.6f,\"gps_lon\":%.6f,\"gps_alt\":%.1f,\"gps_speed\":%.1f,\"gps_sats\":%d,\"grid_square\":\"%s\"",
-        gpsLatitude, gpsLongitude, gpsAltitude, gpsSpeed, gpsSatellites, gridSquare);
+        ",\"gps_has_fix\":%s,\"gps_sats\":%d",
+        gpsHasFix ? "true" : "false", gpsSatellites);
+      if (gpsHasFix) {
+        len += snprintf(jsonBuffer + len, sizeof(jsonBuffer) - len,
+          ",\"gps_lat\":%.6f,\"gps_lon\":%.6f,\"gps_alt\":%.1f,\"gps_speed\":%.1f,\"grid_square\":\"%s\"",
+          gpsLatitude, gpsLongitude, gpsAltitude, gpsSpeed, gridSquare);
+      }
     }
 
     // Close JSON object
@@ -523,38 +532,27 @@ void finishCalibration() {
   Serial.printf("  Min Z: %.2f, Max Z: %.2f, Offset Z: %.2f\n", magMinZ, magMaxZ, magOffsetZ);
 }
 
-// Process incoming GPS data
+// Process incoming GPS data (I2C)
 void processGPS() {
-  while (Serial2.available() > 0) {
-    char c = Serial2.read();
-    if (gps.encode(c)) {
-      // We got valid GPS data - module is connected
-      if (!gpsAvailable) {
-        gpsAvailable = true;
-        Serial.println("GPS module detected!");
-      }
+  if (!gpsAvailable) return;
 
-      // Update GPS fix status based on current validity
-      if (gps.location.isValid()) {
+  // Read available data from GPS over I2C
+  GPS.read();
+
+  // Check if a new NMEA sentence has been received and parse it
+  if (GPS.newNMEAreceived()) {
+    if (GPS.parse(GPS.lastNMEA())) {
+      // Update fix status
+      if (GPS.fix) {
         gpsHasFix = true;
-        gpsLatitude = gps.location.lat();
-        gpsLongitude = gps.location.lng();
+        gpsLatitude = GPS.latitudeDegrees;
+        gpsLongitude = GPS.longitudeDegrees;
+        gpsAltitude = GPS.altitude;
+        gpsSpeed = GPS.speed * 1.852; // Convert knots to km/h
+        gpsSatellites = (int)GPS.satellites;
         calculateGridSquare(gpsLatitude, gpsLongitude, gridSquare);
       } else {
-        // Lost GPS fix
         gpsHasFix = false;
-      }
-
-      if (gps.altitude.isValid()) {
-        gpsAltitude = gps.altitude.meters();
-      }
-
-      if (gps.speed.isValid()) {
-        gpsSpeed = gps.speed.kmph();
-      }
-
-      if (gps.satellites.isValid()) {
-        gpsSatellites = gps.satellites.value();
       }
     }
   }
