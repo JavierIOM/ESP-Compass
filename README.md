@@ -1,6 +1,6 @@
 # ESP32 Digital Compass
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 > **Note:** The OLED display and GPS module features have been implemented but not yet hardware tested. The core compass functionality (LSM303AGR, BME280, calibration) is fully tested and working.
 
@@ -459,6 +459,14 @@ const unsigned long updateInterval = 100; // milliseconds
 Edit `data/index.html` CSS variables to customize colors and styling.
 
 ## Version History
+
+- **v1.0.1** (January 2025) - **Hardware Tested with GPS**
+  - Switched GPS from Serial UART to I2C (Adafruit Mini GPS PA1010D via STEMMA QT)
+  - Fixed false OLED detection when display not connected
+  - Removed verbose serial debug output
+  - Improved JavaScript robustness (null checks, coordinate validation, countdown fix)
+  - GPS panel now shows fix status ("3D", "2D", "No Fix") dynamically
+  - Updated README with accurate wiring diagram and JSON documentation
 
 - **v1.0.0** (January 2025) - **First Stable Release**
   - Promoted to v1.0.0 stable release
