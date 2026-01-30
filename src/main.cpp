@@ -87,7 +87,7 @@ float magMinY, magMaxY;
 float magMinZ, magMaxZ;
 
 // Pre-allocated buffer for JSON to reduce heap fragmentation
-char jsonBuffer[384];
+char jsonBuffer[512];
 
 // Smoothing filter for heading
 #define SMOOTHING_SAMPLES 5
