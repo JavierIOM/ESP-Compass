@@ -647,15 +647,11 @@ void updateDisplay(float heading, const String& direction, float temperature) {
     display.print(tempStr);
   }
 
-  // Network info at bottom
-  display.setCursor(0, 56);
-  display.print(ap_ssid);
-
-  // IP on right
+  // Network info at bottom - show IP centered
   IPAddress ip = WiFi.softAPIP();
   String ipStr = ip.toString();
   display.getTextBounds(ipStr.c_str(), 0, 0, &x1, &y1, &w, &h);
-  display.setCursor(SCREEN_WIDTH - w, 56);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 56);
   display.print(ipStr);
 
   display.display();
