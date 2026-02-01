@@ -4,110 +4,78 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Digital Compass - DEMO MODE</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23ef4444'/%3E%3Cpolygon points='50,15 55,45 50,50 45,45' fill='white'/%3E%3Cpolygon points='50,85 55,55 50,50 45,55' fill='white' opacity='0.6'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23001a00'stroke='%2300ff41' stroke-width='3'/%3E%3Cpolygon points='50,15 54,45 50,50 46,45' fill='%2300ff41'/%3E%3Cpolygon points='50,85 54,55 50,50 46,55' fill='%2300ff41' opacity='0.4'/%3E%3C/svg%3E">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-tertiary: #334155;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --accent: #ef4444;
-            --accent-glow: rgba(239, 68, 68, 0.3);
-            --border: #475569;
-            --success: #10b981;
-        }
-
-        [data-theme="light"] {
-            --bg-primary: #f8fafc;
-            --bg-secondary: #ffffff;
-            --bg-tertiary: #e2e8f0;
-            --text-primary: #0f172a;
-            --text-secondary: #64748b;
-            --accent: #ef4444;
-            --accent-glow: rgba(239, 68, 68, 0.2);
-            --border: #cbd5e1;
-            --success: #059669;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            font-family: "Courier New", Consolas, monospace;
+            background: #0a0a0a;
+            color: #00ff41;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            position: relative;
         }
 
-        header {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 1rem 2rem;
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.15) 2px,
+                rgba(0, 0, 0, 0.15) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .glow { text-shadow: 0 0 8px #00ff41, 0 0 2px #00ff41; }
+        .glow-bright { text-shadow: 0 0 12px #00ff41, 0 0 4px #00ff41, 0 0 20px rgba(0,255,65,0.3); }
+
+        .status-bar {
+            background: #050505;
+            border-bottom: 1px solid #1a3a1a;
+            padding: 0.6rem 1rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 0.8rem;
+            flex-wrap: wrap;
+            gap: 0.4rem;
         }
 
-        h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+        .status-bar .sys-name { letter-spacing: 0.15em; }
 
         .demo-badge {
-            background: #3b82f6;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            display: inline-block;
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+            padding: 0.1rem 0.5rem;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-shadow: 0 0 8px rgba(59,130,246,0.5);
+            margin-left: 0.5rem;
         }
 
         .status-indicator {
-            width: 10px;
-            height: 10px;
+            display: inline-block;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--success);
-            box-shadow: 0 0 10px var(--success);
+            background: #00ff41;
+            box-shadow: 0 0 8px #00ff41;
             animation: pulse 2s ease-in-out infinite;
-        }
-
-        .status-indicator.disconnected {
-            background: var(--accent);
-            box-shadow: 0 0 10px var(--accent);
+            margin-right: 0.4rem;
+            vertical-align: middle;
         }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .theme-toggle {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .theme-toggle:hover {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: white;
+            50% { opacity: 0.4; }
         }
 
         main {
@@ -115,448 +83,403 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            gap: 2rem;
+            padding: 1.5rem 1rem;
+            gap: 1.5rem;
+            max-width: 500px;
+            margin: 0 auto;
+            width: 100%;
         }
 
         .compass-container {
             position: relative;
-            width: min(400px, 90vw);
-            height: min(400px, 90vw);
+            width: min(360px, 88vw);
+            height: min(360px, 88vw);
         }
 
-        .compass-outer {
+        .compass-svg {
             width: 100%;
             height: 100%;
-            background: var(--bg-secondary);
-            border-radius: 50%;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            border: 2px solid var(--border);
-            position: relative;
-            overflow: hidden;
+            filter: drop-shadow(0 0 12px rgba(0,255,65,0.2));
         }
 
-        .compass-inner {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            height: 90%;
-            border-radius: 50%;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
+        .compass-svg .ring { fill: none; stroke: #1a3a1a; stroke-width: 0.5; }
+        .compass-svg .ring-outer { fill: none; stroke: #00ff41; stroke-width: 1.5; opacity: 0.6; }
+        .compass-svg .tick { stroke: #00ff41; stroke-width: 0.8; opacity: 0.5; }
+        .compass-svg .tick-major { stroke: #00ff41; stroke-width: 1.5; opacity: 0.8; }
+        .compass-svg .cardinal {
+            fill: #00ff41;
+            font-family: "Courier New", Consolas, monospace;
+            font-size: 14px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: central;
         }
-
-        .compass-marks {
-            display: none;
+        .compass-svg .cardinal-n { fill: #ff4444; }
+        .compass-svg .degree-label {
+            fill: #00ff41;
+            font-family: "Courier New", Consolas, monospace;
+            font-size: 9px;
+            text-anchor: middle;
+            dominant-baseline: central;
+            opacity: 0.6;
         }
+        .compass-svg .crosshair { stroke: #1a3a1a; stroke-width: 0.5; }
 
-        .compass-degree {
-            position: absolute;
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--text-primary);
-            transform: translate(-50%, -50%);
-        }
-
-        .compass-cardinal {
-            position: absolute;
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: var(--accent);
-            transform: translate(-50%, -50%);
-        }
-
-        .cardinal-n { top: 8%; left: 50%; }
-        .cardinal-e { top: 50%; right: 8%; transform: translate(50%, -50%); }
-        .cardinal-s { bottom: 8%; left: 50%; transform: translate(-50%, 50%); }
-        .cardinal-w { top: 50%; left: 8%; transform: translate(-50%, -50%); }
-
-        .compass-needle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            transform-origin: center center;
+        .needle-group {
             transition: transform 0.3s ease-out;
+            transform-origin: 180px 180px;
+        }
+        .needle-north { fill: #ff4444; filter: drop-shadow(0 0 6px rgba(255,68,68,0.6)); }
+        .needle-south { fill: #00ff41; opacity: 0.35; }
+        .needle-center { fill: #00ff41; filter: drop-shadow(0 0 8px #00ff41); }
+
+        .heading-readout {
+            text-align: center;
+            border: 1px dashed #1a3a1a;
+            padding: 1rem 1.5rem;
+            width: 100%;
         }
 
-        .needle-north {
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-bottom: 140px solid var(--accent);
-            position: absolute;
-            top: -140px;
-            left: -8px;
-            filter: drop-shadow(0 0 10px var(--accent-glow));
+        .heading-readout .label {
+            font-size: 0.75rem;
+            color: #00cc33;
+            opacity: 0.7;
+            margin-bottom: 0.3rem;
         }
 
-        .needle-south {
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 140px solid var(--text-secondary);
-            position: absolute;
-            top: 0;
-            left: -8px;
+        .heading-readout .value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            letter-spacing: 0.08em;
+        }
+
+        .panel {
+            border: 1px dashed #1a3a1a;
+            padding: 1rem;
+            width: 100%;
+        }
+
+        .panel-header {
+            font-size: 0.7rem;
+            color: #00cc33;
+            opacity: 0.7;
+            border-bottom: 1px solid #1a3a1a;
+            padding-bottom: 0.4rem;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.15em;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+
+        .data-cell {
+            text-align: center;
+        }
+
+        .data-cell .label {
+            font-size: 0.65rem;
+            color: #00cc33;
+            opacity: 0.6;
+            margin-bottom: 0.2rem;
+        }
+
+        .data-cell .value {
+            font-size: 1rem;
+            font-weight: bold;
+        }
+
+        .grid-square-display {
+            text-align: center;
+            padding: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .grid-square-display .label {
+            font-size: 0.65rem;
+            color: #00cc33;
             opacity: 0.6;
         }
 
-        .compass-center {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: var(--accent);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 20px var(--accent-glow);
-            z-index: 10;
-        }
-
-        .data-panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 2rem;
-            min-width: min(400px, 90vw);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .data-row:last-child {
-            border-bottom: none;
-        }
-
-        .data-label {
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .data-value {
+        .grid-square-display .value {
             font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent);
+            font-weight: bold;
+            letter-spacing: 0.15em;
         }
 
-        .heading-display {
-            font-size: 3rem;
-            text-align: center;
-            margin-bottom: 1rem;
+        .btn-terminal {
+            background: transparent;
+            border: 1px solid #1a3a1a;
+            color: #00ff41;
+            font-family: "Courier New", Consolas, monospace;
+            font-size: 0.7rem;
+            padding: 0.3rem 0.8rem;
+            cursor: pointer;
+            letter-spacing: 0.1em;
+            transition: all 0.2s;
         }
 
-        .mag-data {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-top: 1rem;
+        .btn-terminal:hover {
+            border-color: #00ff41;
+            text-shadow: 0 0 8px #00ff41;
         }
 
-        .mag-axis {
-            text-align: center;
-            padding: 1rem;
-            background: var(--bg-primary);
-            border-radius: 0.5rem;
+        .map-container {
+            border: 1px solid #1a3a1a;
+            overflow: hidden;
         }
 
-        .mag-axis-label {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
+        .map-container iframe {
+            display: block;
+            filter: hue-rotate(120deg) saturate(0.6) brightness(0.7);
         }
 
-        .mag-axis-value {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
+        .map-footer {
+            font-size: 0.6rem;
+            text-align: right;
+            padding: 0.2rem 0.5rem;
+            background: #0f0f0f;
+        }
+
+        .map-footer a {
+            color: #00cc33;
+            text-decoration: none;
+            opacity: 0.6;
         }
 
         footer {
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
-            padding: 1rem 2rem;
+            border-top: 1px solid #1a3a1a;
+            padding: 0.6rem 1rem;
             text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: 0.65rem;
+            color: #00cc33;
+            opacity: 0.5;
         }
 
-        footer a {
-            color: var(--accent);
-            text-decoration: none;
-        }
+        footer a { color: #00ff41; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
 
-        footer a:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-            header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-
+        @media (max-width: 480px) {
             .compass-container {
-                width: min(300px, 90vw);
-                height: min(300px, 90vw);
+                width: min(300px, 88vw);
+                height: min(300px, 88vw);
             }
-
-            .compass-mark {
-                transform-origin: 50% 150px;
-            }
-
-            .needle-north {
-                border-bottom-width: 100px;
-                top: -100px;
-            }
-
-            .needle-south {
-                border-top-width: 100px;
-                bottom: -100px;
-            }
-
-            .heading-display {
-                font-size: 2rem;
-            }
+            .heading-readout .value { font-size: 1.7rem; }
+            .data-cell .value { font-size: 0.85rem; }
+            .status-bar { font-size: 0.7rem; }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>
+    <div class="status-bar">
+        <span class="sys-name glow">
             <span class="status-indicator" id="status"></span>
-            ESP32 Digital Compass
-            <span class="demo-badge">Demo Mode</span>
-        </h1>
-        <button class="theme-toggle" id="themeToggle">Toggle Light Mode</button>
-    </header>
+            ESP32-COMPASS
+            <span class="demo-badge">DEMO</span>
+        </span>
+        <span class="glow">SYS: SIMULATED // v1.0.1</span>
+    </div>
 
     <main>
         <div class="compass-container">
-            <div class="compass-outer">
-                <div class="compass-inner">
-                    <div class="compass-marks" id="compassMarks"></div>
-                    <div class="compass-cardinal cardinal-n">N</div>
-                    <div class="compass-cardinal cardinal-e">E</div>
-                    <div class="compass-cardinal cardinal-s">S</div>
-                    <div class="compass-cardinal cardinal-w">W</div>
-                    <div class="compass-needle" id="needle">
-                        <div class="needle-north"></div>
-                        <div class="needle-south"></div>
-                    </div>
-                    <div class="compass-center"></div>
+            <svg class="compass-svg" viewBox="0 0 360 360" id="compassSvg">
+                <circle cx="180" cy="180" r="170" class="ring-outer"/>
+                <circle cx="180" cy="180" r="136" class="ring"/>
+                <circle cx="180" cy="180" r="102" class="ring"/>
+                <circle cx="180" cy="180" r="68" class="ring"/>
+                <circle cx="180" cy="180" r="34" class="ring"/>
+                <line x1="180" y1="10" x2="180" y2="350" class="crosshair"/>
+                <line x1="10" y1="180" x2="350" y2="180" class="crosshair"/>
+                <g id="tickMarks"></g>
+                <text x="180" y="22" class="cardinal cardinal-n">N</text>
+                <text x="348" y="184" class="cardinal">E</text>
+                <text x="180" y="356" class="cardinal">S</text>
+                <text x="12" y="184" class="cardinal">W</text>
+                <g class="needle-group" id="needle">
+                    <polygon points="180,30 186,170 180,180 174,170" class="needle-north"/>
+                    <polygon points="180,330 186,190 180,180 174,190" class="needle-south"/>
+                </g>
+                <circle cx="180" cy="180" r="5" class="needle-center"/>
+            </svg>
+        </div>
+
+        <div class="heading-readout">
+            <div class="label">HEADING</div>
+            <div class="value glow-bright">
+                <span id="headingDegrees">0.0°</span>
+                <span style="margin-left: 0.5rem;" id="heading">N</span>
+            </div>
+            <div class="label" id="direction" style="margin-top: 0.3rem;">North</div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">// MAGNETOMETER</div>
+            <div class="data-grid">
+                <div class="data-cell">
+                    <div class="label">X AXIS</div>
+                    <div class="value glow" id="magX">25.50 uT</div>
+                </div>
+                <div class="data-cell">
+                    <div class="label">Y AXIS</div>
+                    <div class="value glow" id="magY">-12.30 uT</div>
+                </div>
+                <div class="data-cell">
+                    <div class="label">Z AXIS</div>
+                    <div class="value glow" id="magZ">45.20 uT</div>
                 </div>
             </div>
         </div>
 
-        <div class="data-panel">
-            <div class="heading-display">
-                <div class="data-value" id="heading">N</div>
-                <div class="data-label" id="direction">North</div>
-            </div>
-
-            <div class="data-row">
-                <span class="data-label">Heading</span>
-                <span class="data-value" id="headingDegrees">0.0°</span>
-            </div>
-
-            <div class="mag-data">
-                <div class="mag-axis">
-                    <div class="mag-axis-label">X Axis</div>
-                    <div class="mag-axis-value" id="magX">25.50 µT</div>
+        <div class="panel">
+            <div class="panel-header">// ENVIRONMENT</div>
+            <div class="data-grid">
+                <div class="data-cell">
+                    <div class="label">TEMP</div>
+                    <div class="value glow" id="temperature">21.5C</div>
                 </div>
-                <div class="mag-axis">
-                    <div class="mag-axis-label">Y Axis</div>
-                    <div class="mag-axis-value" id="magY">-12.30 µT</div>
+                <div class="data-cell">
+                    <div class="label">HUMIDITY</div>
+                    <div class="value glow" id="humidity">45.2%</div>
                 </div>
-                <div class="mag-axis">
-                    <div class="mag-axis-label">Z Axis</div>
-                    <div class="mag-axis-value" id="magZ">45.20 µT</div>
+                <div class="data-cell">
+                    <div class="label">PRESSURE</div>
+                    <div class="value glow" id="pressure">1013 hPa</div>
                 </div>
             </div>
+        </div>
 
-            <div class="env-data" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
-                <div class="env-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <span class="data-label" style="font-size: 1rem; font-weight: 600;">Environment</span>
-                    <span style="background: var(--success); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;">BME280</span>
+        <div class="panel">
+            <div class="panel-header">// GPS</div>
+
+            <div class="grid-square-display">
+                <div class="label">GRID SQUARE</div>
+                <div class="value glow-bright" id="gridSquare">IO74re</div>
+            </div>
+
+            <div class="data-grid">
+                <div class="data-cell">
+                    <div class="label">LAT</div>
+                    <div class="value glow" id="gpsLat">54.1744</div>
                 </div>
-                <div class="mag-data">
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Temperature</div>
-                        <div class="mag-axis-value" id="temperature">21.5°C</div>
-                    </div>
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Humidity</div>
-                        <div class="mag-axis-value" id="humidity">45.2%</div>
-                    </div>
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Pressure</div>
-                        <div class="mag-axis-value" id="pressure">1013 hPa</div>
-                    </div>
+                <div class="data-cell">
+                    <div class="label">LON</div>
+                    <div class="value glow" id="gpsLon">-4.5474</div>
+                </div>
+                <div class="data-cell">
+                    <div class="label">SATS</div>
+                    <div class="value glow" id="gpsSats">8</div>
                 </div>
             </div>
 
-            <div class="gps-data" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
-                <div class="gps-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <span class="data-label" style="font-size: 1rem; font-weight: 600;">GPS Location</span>
-                    <span class="gps-fix" style="background: var(--success); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;">3D FIX</span>
+            <div class="data-grid" style="margin-top: 0.75rem;">
+                <div class="data-cell">
+                    <div class="label">ALT</div>
+                    <div class="value glow" id="gpsAlt">127m</div>
                 </div>
+                <div class="data-cell">
+                    <div class="label">SPEED</div>
+                    <div class="value glow" id="gpsSpeed">0.0 mph</div>
+                </div>
+                <div class="data-cell">
+                    <div class="label">FIX</div>
+                    <div class="value glow" id="gpsFix" style="color: #00ff41;">3D</div>
+                </div>
+            </div>
 
-                <div class="grid-square" style="text-align: center; margin-bottom: 1rem;">
-                    <div class="mag-axis-label">Maidenhead Grid Square</div>
-                    <div class="data-value" id="gridSquare" style="font-size: 2rem; letter-spacing: 0.1em;">IO74re</div>
-                </div>
+            <div style="text-align: center; margin-top: 0.75rem;">
+                <button class="btn-terminal" id="gpsDetailToggle" onclick="toggleGpsDetails()">[SHOW DETAILS]</button>
+            </div>
 
-                <div class="mag-data">
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Latitude</div>
-                        <div class="mag-axis-value" id="latitude">54.1744°N</div>
+            <div id="gpsDetailPanel" style="display: none; margin-top: 0.75rem;">
+                <div class="data-grid">
+                    <div class="data-cell">
+                        <div class="label">UTC TIME</div>
+                        <div class="value glow">14:32:07</div>
                     </div>
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Longitude</div>
-                        <div class="mag-axis-value" id="longitude">4.5474°W</div>
+                    <div class="data-cell">
+                        <div class="label">UTC DATE</div>
+                        <div class="value glow">2025/01/30</div>
                     </div>
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Satellites</div>
-                        <div class="mag-axis-value" id="satellites">8</div>
+                    <div class="data-cell">
+                        <div class="label">FIX QUAL</div>
+                        <div class="value glow">GPS</div>
                     </div>
                 </div>
+                <div class="data-grid" style="margin-top: 0.5rem;">
+                    <div class="data-cell">
+                        <div class="label">HDOP</div>
+                        <div class="value glow">1.2</div>
+                    </div>
+                    <div class="data-cell">
+                        <div class="label">VDOP</div>
+                        <div class="value glow">1.8</div>
+                    </div>
+                    <div class="data-cell">
+                        <div class="label">PDOP</div>
+                        <div class="value glow">2.1</div>
+                    </div>
+                </div>
+            </div>
 
-                <div class="mag-data" style="margin-top: 1rem;">
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Altitude</div>
-                        <div class="mag-axis-value" id="altitude">127m</div>
-                    </div>
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Speed</div>
-                        <div class="mag-axis-value" id="speed">0.0 mph</div>
-                    </div>
-                    <div class="mag-axis">
-                        <div class="mag-axis-label">Accuracy</div>
-                        <div class="mag-axis-value" id="accuracy">2.5m</div>
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 0.75rem;">
-                    <button class="btn btn-secondary" id="gpsDetailToggle" onclick="toggleGpsDetails()" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Show Details</button>
-                </div>
-                <div id="gpsDetailPanel" style="display: none; margin-top: 0.75rem;">
-                    <div class="mag-data">
-                        <div class="mag-axis">
-                            <div class="mag-axis-label">UTC Time</div>
-                            <div class="mag-axis-value">14:32:07</div>
-                        </div>
-                        <div class="mag-axis">
-                            <div class="mag-axis-label">UTC Date</div>
-                            <div class="mag-axis-value">2025/01/30</div>
-                        </div>
-                        <div class="mag-axis">
-                            <div class="mag-axis-label">Fix Quality</div>
-                            <div class="mag-axis-value">GPS</div>
-                        </div>
-                    </div>
-                    <div class="mag-data" style="margin-top: 0.5rem;">
-                        <div class="mag-axis">
-                            <div class="mag-axis-label">HDOP</div>
-                            <div class="mag-axis-value">1.2</div>
-                        </div>
-                        <div class="mag-axis">
-                            <div class="mag-axis-label">VDOP</div>
-                            <div class="mag-axis-value">1.8</div>
-                        </div>
-                        <div class="mag-axis">
-                            <div class="mag-axis-label">PDOP</div>
-                            <div class="mag-axis-value">2.1</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="map-container" style="margin-top: 1rem; border-radius: 0.5rem; overflow: hidden; border: 1px solid var(--border);">
-                    <iframe
-                        id="gpsMap"
-                        width="100%"
-                        height="200"
-                        frameborder="0"
-                        scrolling="no"
-                        style="display: block;"
-                        src="https://www.openstreetmap.org/export/embed.html?bbox=-4.62%2C54.12%2C-4.48%2C54.22&layer=mapnik&marker=54.174447%2C-4.547421">
-                    </iframe>
-                    <div style="font-size: 0.7rem; text-align: right; padding: 0.25rem 0.5rem; background: var(--bg-tertiary);">
-                        <a href="https://www.openstreetmap.org/?mlat=54.174447&mlon=-4.547421#map=13/54.174447/-4.547421" target="_blank" style="color: var(--text-secondary);">View larger map</a>
-                    </div>
+            <div class="map-container" style="margin-top: 1rem;">
+                <iframe
+                    id="gpsMap"
+                    width="100%"
+                    height="200"
+                    frameborder="0"
+                    scrolling="no"
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=-4.62%2C54.12%2C-4.48%2C54.22&layer=mapnik&marker=54.174447%2C-4.547421">
+                </iframe>
+                <div class="map-footer">
+                    <a href="https://www.openstreetmap.org/?mlat=54.174447&mlon=-4.547421#map=13/54.174447/-4.547421" target="_blank">VIEW LARGER MAP</a>
                 </div>
             </div>
         </div>
     </main>
 
     <footer>
-        <p>ESP32 Digital Compass with LSM303AGR + BME280 + GPS | v1.0.1 | <strong>DEMO MODE - Simulated Data</strong> | <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">View on GitHub</a></p>
+        ESP32 DIGITAL COMPASS // LSM303AGR // v1.0.1 // DEMO MODE // <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">GITHUB</a>
     </footer>
 
     <script>
-        // Theme management
-        const themeToggle = document.getElementById('themeToggle');
-        const htmlElement = document.documentElement;
+        // Generate tick marks
+        const tickMarks = document.getElementById('tickMarks');
+        for (let deg = 0; deg < 360; deg += 5) {
+            const isMajor = deg % 30 === 0;
+            const isCardinal = deg % 90 === 0;
+            if (isCardinal) continue;
 
-        // Set dark mode as default
-        if (!localStorage.getItem('theme')) {
-            localStorage.setItem('theme', 'dark');
-        }
+            const angle = (deg - 90) * Math.PI / 180;
+            const outerR = 170;
+            const innerR = isMajor ? 155 : 162;
+            const x1 = 180 + outerR * Math.cos(angle);
+            const y1 = 180 + outerR * Math.sin(angle);
+            const x2 = 180 + innerR * Math.cos(angle);
+            const y2 = 180 + innerR * Math.sin(angle);
 
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme === 'light') {
-            htmlElement.setAttribute('data-theme', 'light');
-            themeToggle.textContent = 'Toggle Dark Mode';
-        } else {
-            themeToggle.textContent = 'Toggle Light Mode';
-        }
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("class", isMajor ? "tick-major" : "tick");
+            tickMarks.appendChild(line);
 
-        themeToggle.addEventListener('click', () => {
-            const theme = htmlElement.getAttribute('data-theme');
-            if (theme === 'light') {
-                htmlElement.removeAttribute('data-theme');
-                localStorage.setItem('theme', 'dark');
-                themeToggle.textContent = 'Toggle Light Mode';
-            } else {
-                htmlElement.setAttribute('data-theme', 'light');
-                localStorage.setItem('theme', 'light');
-                themeToggle.textContent = 'Toggle Dark Mode';
+            if (isMajor) {
+                const labelR = 145;
+                const lx = 180 + labelR * Math.cos(angle);
+                const ly = 180 + labelR * Math.sin(angle);
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", lx);
+                text.setAttribute("y", ly);
+                text.setAttribute("class", "degree-label");
+                text.textContent = deg + "";
+                tickMarks.appendChild(text);
             }
-        });
-
-        // Generate degree labels around the compass
-        const compassInner = document.querySelector('.compass-inner');
-        const radiusPercent = 32; // Position at 32% from center (between center and edge)
-
-        for (let deg = 0; deg < 360; deg += 45) {
-            const label = document.createElement('div');
-            label.className = 'compass-degree';
-            label.textContent = deg + '°';
-
-            // Calculate position - start from 0 at top
-            const angle = (deg - 90) * Math.PI / 180; // -90 to make 0° at top
-            const x = 50 + radiusPercent * Math.cos(angle);
-            const y = 50 + radiusPercent * Math.sin(angle);
-
-            label.style.left = x + '%';
-            label.style.top = y + '%';
-
-            compassInner.appendChild(label);
         }
 
-        // Get DOM elements
         const status = document.getElementById('status');
         const needle = document.getElementById('needle');
         const heading = document.getElementById('heading');
@@ -568,28 +491,12 @@
         const temperature = document.getElementById('temperature');
         const humidity = document.getElementById('humidity');
         const pressure = document.getElementById('pressure');
-        const latitude = document.getElementById('latitude');
-        const longitude = document.getElementById('longitude');
-        const altitude = document.getElementById('altitude');
-        const speed = document.getElementById('speed');
-        const satellites = document.getElementById('satellites');
-        const accuracy = document.getElementById('accuracy');
-        const gridSquare = document.getElementById('gridSquare');
 
-        // Base GPS coordinates (Glen Vine, Isle of Man - IO74RE)
-        const baseLat = 54.174447;
-        const baseLon = -4.547421;
-
-        // Simulate compass rotation
         let currentHeading = 0;
         let targetHeading = 0;
         let lastChangeTime = Date.now();
-
-        // Slower update timers for environmental and GPS data
         let lastEnvUpdate = 0;
-        const envUpdateInterval = 5000; // Update environmental data every 5 seconds
-
-        // Current environmental values (stored between updates)
+        const envUpdateInterval = 5000;
         let currentTemp = 21.5;
         let currentHumidity = 45.2;
         let currentPressure = 1013;
@@ -601,69 +508,46 @@
                 "S", "SSW", "SW", "WSW",
                 "W", "WNW", "NW", "NNW"
             ];
-            const index = Math.round(deg / 22.5) % 16;
-            return directions[index];
+            return directions[Math.round(deg / 22.5) % 16];
         }
 
         function updateCompass() {
-            // Change target heading every 3-8 seconds
             if (Date.now() - lastChangeTime > (3000 + Math.random() * 5000)) {
                 targetHeading = Math.random() * 360;
                 lastChangeTime = Date.now();
             }
 
-            // Smoothly interpolate towards target
             const diff = targetHeading - currentHeading;
             const shortestDiff = ((diff + 180) % 360) - 180;
             currentHeading += shortestDiff * 0.02;
             currentHeading = (currentHeading + 360) % 360;
 
-            // Update needle rotation (keep centered with translate)
-            needle.style.transform = `translate(-50%, -50%) rotate(${currentHeading}deg)`;
+            // Rotate SVG needle
+            needle.setAttribute('transform', `rotate(${currentHeading}, 180, 180)`);
 
-            // Update displays
             const cardinalDir = getCardinalDirection(currentHeading);
             heading.textContent = cardinalDir;
             headingDegrees.textContent = `${currentHeading.toFixed(1)}°`;
             direction.textContent = cardinalDir;
 
-            // Simulate magnetometer readings based on heading
             const headingRad = currentHeading * Math.PI / 180;
-            const magXVal = Math.cos(headingRad) * 25 + (Math.random() - 0.5) * 2;
-            const magYVal = Math.sin(headingRad) * 25 + (Math.random() - 0.5) * 2;
-            const magZVal = 45 + (Math.random() - 0.5) * 3;
+            magX.textContent = `${(Math.cos(headingRad) * 25 + (Math.random() - 0.5) * 2).toFixed(2)} uT`;
+            magY.textContent = `${(Math.sin(headingRad) * 25 + (Math.random() - 0.5) * 2).toFixed(2)} uT`;
+            magZ.textContent = `${(45 + (Math.random() - 0.5) * 3).toFixed(2)} uT`;
 
-            magX.textContent = `${magXVal.toFixed(2)} µT`;
-            magY.textContent = `${magYVal.toFixed(2)} µT`;
-            magZ.textContent = `${magZVal.toFixed(2)} µT`;
-
-            // Simulate environmental readings (BME280) - update every 5 seconds
             const now = Date.now();
             if (now - lastEnvUpdate >= envUpdateInterval) {
                 lastEnvUpdate = now;
-                // Small realistic drift in environmental values
-                currentTemp += (Math.random() - 0.5) * 0.2;
-                currentHumidity += (Math.random() - 0.5) * 0.5;
-                currentPressure += (Math.random() - 0.5) * 0.5;
-
-                // Keep values in realistic ranges
-                currentTemp = Math.max(15, Math.min(30, currentTemp));
-                currentHumidity = Math.max(30, Math.min(70, currentHumidity));
-                currentPressure = Math.max(990, Math.min(1030, currentPressure));
-
-                temperature.textContent = `${currentTemp.toFixed(1)}°C`;
+                currentTemp = Math.max(15, Math.min(30, currentTemp + (Math.random() - 0.5) * 0.2));
+                currentHumidity = Math.max(30, Math.min(70, currentHumidity + (Math.random() - 0.5) * 0.5));
+                currentPressure = Math.max(990, Math.min(1030, currentPressure + (Math.random() - 0.5) * 0.5));
+                temperature.textContent = `${currentTemp.toFixed(1)}C`;
                 humidity.textContent = `${currentHumidity.toFixed(1)}%`;
                 pressure.textContent = `${currentPressure.toFixed(0)} hPa`;
             }
-
-            // GPS data is static for demo (device is stationary)
-            // These values don't change - no jitter needed
         }
 
-        // Show as connected
         status.classList.remove('disconnected');
-
-        // Update compass at 10Hz
         setInterval(updateCompass, 100);
 
         function toggleGpsDetails() {
@@ -671,10 +555,10 @@
             const btn = document.getElementById('gpsDetailToggle');
             if (panel.style.display === 'none') {
                 panel.style.display = 'block';
-                btn.textContent = 'Hide Details';
+                btn.textContent = '[HIDE DETAILS]';
             } else {
                 panel.style.display = 'none';
-                btn.textContent = 'Show Details';
+                btn.textContent = '[SHOW DETAILS]';
             }
         }
 
