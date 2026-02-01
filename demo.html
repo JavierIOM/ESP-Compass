@@ -127,7 +127,8 @@
 
         .needle-group {
             transition: transform 0.3s ease-out;
-            transform-origin: 180px 180px;
+            transform-origin: 50% 50%;
+            transform-box: fill-box;
         }
         .needle-north { fill: #ff4444; filter: drop-shadow(0 0 6px rgba(255,68,68,0.6)); }
         .needle-south { fill: #00ff41; opacity: 0.35; }
@@ -523,7 +524,7 @@
             currentHeading = (currentHeading + 360) % 360;
 
             // Rotate SVG needle
-            needle.setAttribute('transform', `rotate(${currentHeading}, 180, 180)`);
+            needle.style.transform = `rotate(${currentHeading}deg)`;
 
             const cardinalDir = getCardinalDirection(currentHeading);
             heading.textContent = cardinalDir;

@@ -127,7 +127,8 @@
         /* Needle group - rotates */
         .needle-group {
             transition: transform 0.3s ease-out;
-            transform-origin: 180px 180px;
+            transform-origin: 50% 50%;
+            transform-box: fill-box;
         }
         .needle-north { fill: #ff4444; filter: drop-shadow(0 0 6px rgba(255,68,68,0.6)); }
         .needle-south { fill: #00ff41; opacity: 0.35; }
@@ -676,7 +677,7 @@
             }
 
             // Rotate needle SVG group
-            needle.setAttribute('transform', `rotate(${data.heading}, 180, 180)`);
+            needle.style.transform = `rotate(${data.heading}deg)`;
 
             // Update displays
             heading.textContent = data.direction;
