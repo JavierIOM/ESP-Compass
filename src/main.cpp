@@ -422,6 +422,7 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       memcpy(msgBuffer, data, copyLen);
       msgBuffer[copyLen] = '\0';
       String msg = msgBuffer;
+      Serial.printf("WS received: %s\n", msgBuffer);
 
       if (msg.indexOf("calN") >= 0) {
         captureCalPoint(0);

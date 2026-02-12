@@ -808,8 +808,22 @@
         }
 
         function capturePoint(dir) {
+            const btn = calBtns[dir];
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({cmd: 'cal' + dir}));
+                console.log('Sent cal' + dir);
+                // Immediate visual feedback (flash)
+                btn.style.background = 'rgba(0,255,65,0.3)';
+                btn.style.color = '#00ff41';
+                setTimeout(() => {
+                    if (!btn.classList.contains('captured')) {
+                        btn.style.background = '';
+                        btn.style.color = '';
+                    }
+                }, 500);
+            } else {
+                calStatus.textContent = 'NOT CONNECTED';
+                setTimeout(() => { calStatus.textContent = ''; }, 2000);
             }
         }
 
