@@ -13,11 +13,14 @@
 
 // EEPROM configuration
 #define EEPROM_SIZE 64
-#define CALIBRATION_MAGIC 0xCAFE  // Magic number to verify valid calibration data
+#define CALIBRATION_MAGIC_OLD 0xCAFE  // Old format (offsets only)
+#define CALIBRATION_MAGIC 0xCAF2      // New format (offsets + scale)
 #define EEPROM_MAGIC_ADDR 0
 #define EEPROM_OFFSET_X_ADDR 2
 #define EEPROM_OFFSET_Y_ADDR 6
 #define EEPROM_OFFSET_Z_ADDR 10
+#define EEPROM_SCALE_X_ADDR 14
+#define EEPROM_SCALE_Y_ADDR 18
 
 // Access Point credentials - CHANGE THESE IF DESIRED
 const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
@@ -71,20 +74,22 @@ AsyncWebSocket ws("/ws");
 unsigned long lastUpdate = 0;
 const unsigned long updateInterval = 100; // Update every 100ms
 
-// Calibration offsets (loaded from EEPROM or set via calibration)
+// Calibration offsets and scale (loaded from EEPROM or set via calibration)
 float magOffsetX = 0.0;
 float magOffsetY = 0.0;
 float magOffsetZ = 0.0;
+float magScaleX = 1.0;
+float magScaleY = 1.0;
 
-// Calibration state
-bool calibrating = false;
-unsigned long calibrationStartTime = 0;
-const unsigned long calibrationDuration = 15000; // 15 seconds
+// 4-point cardinal calibration state
+struct CalPoint { float x, y, z; };
+CalPoint calPoints[4]; // 0=N, 1=E, 2=S, 3=W
+uint8_t calPointsMask = 0; // Bitmask: bit0=N, bit1=E, bit2=S, bit3=W
 
-// Min/Max tracking during calibration
-float magMinX, magMaxX;
-float magMinY, magMaxY;
-float magMinZ, magMaxZ;
+// Latest raw magnetometer reading (for calibration capture)
+float latestRawMagX = 0.0;
+float latestRawMagY = 0.0;
+float latestRawMagZ = 0.0;
 
 // Pre-allocated buffer for JSON to reduce heap fragmentation
 char jsonBuffer[512];
@@ -102,9 +107,8 @@ float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, fl
 String getCardinalDirection(float heading);
 void loadCalibration();
 void saveCalibration();
-void startCalibration();
-void updateCalibration(float mx, float my, float mz);
-void finishCalibration();
+void captureCalPoint(int index);
+void computeCalibration();
 void updateDisplay(float heading, const String& direction, float temperature);
 void calculateGridSquare(float lat, float lon, char* grid);
 void processGPS();
@@ -219,11 +223,6 @@ void loop() {
   // Process GPS data if available
   processGPS();
 
-  // Check if calibration is complete
-  if (calibrating && (millis() - calibrationStartTime >= calibrationDuration)) {
-    finishCalibration();
-  }
-
   // Read and send compass data at regular intervals
   if (millis() - lastUpdate >= updateInterval) {
     lastUpdate = millis();
@@ -235,20 +234,17 @@ void loop() {
     accel.getEvent(&accel_event);
     mag.getEvent(&mag_event);
 
-    // Get raw magnetometer values
+    // Get raw magnetometer values and store for calibration capture
     float raw_mag_x = mag_event.magnetic.x;
     float raw_mag_y = mag_event.magnetic.y;
     float raw_mag_z = mag_event.magnetic.z;
+    latestRawMagX = raw_mag_x;
+    latestRawMagY = raw_mag_y;
+    latestRawMagZ = raw_mag_z;
 
-
-    // Update calibration if in progress (use raw values)
-    if (calibrating) {
-      updateCalibration(raw_mag_x, raw_mag_y, raw_mag_z);
-    }
-
-    // Apply calibration offsets
-    float mag_x = raw_mag_x - magOffsetX;
-    float mag_y = raw_mag_y - magOffsetY;
+    // Apply calibration offsets and scale
+    float mag_x = (raw_mag_x - magOffsetX) * magScaleX;
+    float mag_y = (raw_mag_y - magOffsetY) * magScaleY;
     float mag_z = raw_mag_z - magOffsetZ;
 
     // Calculate heading with tilt compensation
@@ -286,13 +282,6 @@ void loop() {
     // Get cardinal direction
     String direction = getCardinalDirection(heading);
 
-    // Calculate remaining calibration time
-    int calRemaining = 0;
-    if (calibrating) {
-      calRemaining = (int)((calibrationDuration - (millis() - calibrationStartTime)) / 1000) + 1;
-      if (calRemaining < 0) calRemaining = 0;
-    }
-
     // Read environmental data if available
     float temperature = 0.0;
     float humidity = 0.0;
@@ -305,9 +294,9 @@ void loop() {
 
     // Build JSON with all available data
     int len = snprintf(jsonBuffer, sizeof(jsonBuffer),
-      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"calibrating\":%s,\"calRemaining\":%d",
+      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"cal\":%d",
       heading, direction.c_str(), mag_x, mag_y, mag_z,
-      calibrating ? "true" : "false", calRemaining);
+      calPointsMask);
 
     // Add environmental data if available
     if (bmeAvailable) {
@@ -434,16 +423,23 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       msgBuffer[copyLen] = '\0';
       String msg = msgBuffer;
 
-      if (msg.indexOf("startCal") >= 0) {
-        startCalibration();
-        Serial.println("Calibration started via WebSocket");
+      if (msg.indexOf("calN") >= 0) {
+        captureCalPoint(0);
+      } else if (msg.indexOf("calE") >= 0) {
+        captureCalPoint(1);
+      } else if (msg.indexOf("calS") >= 0) {
+        captureCalPoint(2);
+      } else if (msg.indexOf("calW") >= 0) {
+        captureCalPoint(3);
       } else if (msg.indexOf("clearCal") >= 0) {
-        // Clear calibration
         magOffsetX = 0.0;
         magOffsetY = 0.0;
         magOffsetZ = 0.0;
+        magScaleX = 1.0;
+        magScaleY = 1.0;
+        calPointsMask = 0;
         saveCalibration();
-        Serial.println("Calibration cleared via WebSocket");
+        Serial.println("Calibration cleared");
       }
     }
   }
@@ -455,89 +451,111 @@ void loadCalibration() {
   EEPROM.get(EEPROM_MAGIC_ADDR, magic);
 
   if (magic == CALIBRATION_MAGIC) {
+    // New format: offsets + scale
     EEPROM.get(EEPROM_OFFSET_X_ADDR, magOffsetX);
     EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
     EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
+    EEPROM.get(EEPROM_SCALE_X_ADDR, magScaleX);
+    EEPROM.get(EEPROM_SCALE_Y_ADDR, magScaleY);
 
-    // Sanity check: typical magnetometer offsets should be within +/- 200 µT
-    // If values are NaN, Inf, or out of range, reset to zero
     bool valid = true;
     if (isnan(magOffsetX) || isinf(magOffsetX) || fabs(magOffsetX) > 200.0) valid = false;
     if (isnan(magOffsetY) || isinf(magOffsetY) || fabs(magOffsetY) > 200.0) valid = false;
     if (isnan(magOffsetZ) || isinf(magOffsetZ) || fabs(magOffsetZ) > 200.0) valid = false;
+    if (isnan(magScaleX) || isinf(magScaleX) || magScaleX < 0.1 || magScaleX > 10.0) valid = false;
+    if (isnan(magScaleY) || isinf(magScaleY) || magScaleY < 0.1 || magScaleY > 10.0) valid = false;
 
     if (valid) {
       Serial.println("Calibration loaded from EEPROM:");
-      Serial.printf("  Offset X: %.2f\n", magOffsetX);
-      Serial.printf("  Offset Y: %.2f\n", magOffsetY);
-      Serial.printf("  Offset Z: %.2f\n", magOffsetZ);
+      Serial.printf("  Offset: %.2f, %.2f, %.2f\n", magOffsetX, magOffsetY, magOffsetZ);
+      Serial.printf("  Scale:  %.3f, %.3f\n", magScaleX, magScaleY);
     } else {
-      Serial.println("EEPROM calibration data invalid - resetting to zero");
-      magOffsetX = 0.0;
-      magOffsetY = 0.0;
-      magOffsetZ = 0.0;
+      Serial.println("EEPROM calibration data invalid - resetting");
+      magOffsetX = 0.0; magOffsetY = 0.0; magOffsetZ = 0.0;
+      magScaleX = 1.0; magScaleY = 1.0;
     }
+  } else if (magic == CALIBRATION_MAGIC_OLD) {
+    // Old format: offsets only
+    EEPROM.get(EEPROM_OFFSET_X_ADDR, magOffsetX);
+    EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
+    EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
+    magScaleX = 1.0; magScaleY = 1.0;
+    Serial.println("Old calibration format loaded (offsets only)");
   } else {
     Serial.println("No calibration data found in EEPROM");
-    magOffsetX = 0.0;
-    magOffsetY = 0.0;
-    magOffsetZ = 0.0;
+    magOffsetX = 0.0; magOffsetY = 0.0; magOffsetZ = 0.0;
+    magScaleX = 1.0; magScaleY = 1.0;
   }
 }
 
-// Save calibration offsets to EEPROM
+// Save calibration offsets and scale to EEPROM
 void saveCalibration() {
   uint16_t magic = CALIBRATION_MAGIC;
   EEPROM.put(EEPROM_MAGIC_ADDR, magic);
   EEPROM.put(EEPROM_OFFSET_X_ADDR, magOffsetX);
   EEPROM.put(EEPROM_OFFSET_Y_ADDR, magOffsetY);
   EEPROM.put(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
+  EEPROM.put(EEPROM_SCALE_X_ADDR, magScaleX);
+  EEPROM.put(EEPROM_SCALE_Y_ADDR, magScaleY);
   EEPROM.commit();
   Serial.println("Calibration saved to EEPROM");
 }
 
-// Start calibration process
-void startCalibration() {
-  calibrating = true;
-  calibrationStartTime = millis();
+// Capture a cardinal calibration point (0=N, 1=E, 2=S, 3=W)
+void captureCalPoint(int index) {
+  if (index < 0 || index > 3) return;
 
-  // Initialize min/max with extreme values
-  magMinX = 99999.0;
-  magMaxX = -99999.0;
-  magMinY = 99999.0;
-  magMaxY = -99999.0;
-  magMinZ = 99999.0;
-  magMaxZ = -99999.0;
+  const char* labels[] = {"NORTH", "EAST", "SOUTH", "WEST"};
+  calPoints[index].x = latestRawMagX;
+  calPoints[index].y = latestRawMagY;
+  calPoints[index].z = latestRawMagZ;
+  calPointsMask |= (1 << index);
 
-  Serial.println("Calibration started - rotate the compass in all directions");
+  Serial.printf("Cal point %s captured: %.2f, %.2f, %.2f\n",
+    labels[index], latestRawMagX, latestRawMagY, latestRawMagZ);
+
+  // Auto-compute when all 4 points are captured
+  if (calPointsMask == 0x0F) {
+    computeCalibration();
+  }
 }
 
-// Update calibration with new magnetometer reading
-void updateCalibration(float mx, float my, float mz) {
-  if (mx < magMinX) magMinX = mx;
-  if (mx > magMaxX) magMaxX = mx;
-  if (my < magMinY) magMinY = my;
-  if (my > magMaxY) magMaxY = my;
-  if (mz < magMinZ) magMinZ = mz;
-  if (mz > magMaxZ) magMaxZ = mz;
-}
+// Compute calibration from 4 cardinal points
+void computeCalibration() {
+  // Hard-iron offsets: average of all 4 points (center of the ellipse)
+  magOffsetX = (calPoints[0].x + calPoints[1].x + calPoints[2].x + calPoints[3].x) / 4.0;
+  magOffsetY = (calPoints[0].y + calPoints[1].y + calPoints[2].y + calPoints[3].y) / 4.0;
+  magOffsetZ = (calPoints[0].z + calPoints[1].z + calPoints[2].z + calPoints[3].z) / 4.0;
 
-// Finish calibration and calculate offsets
-void finishCalibration() {
-  calibrating = false;
+  // Soft-iron scale: normalize X/Y ranges so ellipse becomes a circle
+  float cx[4], cy[4];
+  float minX = 99999, maxX = -99999, minY = 99999, maxY = -99999;
 
-  // Calculate offsets as midpoint of min/max (hard-iron correction)
-  magOffsetX = (magMinX + magMaxX) / 2.0;
-  magOffsetY = (magMinY + magMaxY) / 2.0;
-  magOffsetZ = (magMinZ + magMaxZ) / 2.0;
+  for (int i = 0; i < 4; i++) {
+    cx[i] = calPoints[i].x - magOffsetX;
+    cy[i] = calPoints[i].y - magOffsetY;
+    if (cx[i] < minX) minX = cx[i];
+    if (cx[i] > maxX) maxX = cx[i];
+    if (cy[i] < minY) minY = cy[i];
+    if (cy[i] > maxY) maxY = cy[i];
+  }
+
+  float rangeX = maxX - minX;
+  float rangeY = maxY - minY;
+  float avgRange = (rangeX + rangeY) / 2.0;
+
+  magScaleX = (rangeX > 0.001) ? avgRange / rangeX : 1.0;
+  magScaleY = (rangeY > 0.001) ? avgRange / rangeY : 1.0;
 
   // Save to EEPROM
   saveCalibration();
 
-  Serial.println("Calibration complete!");
-  Serial.printf("  Min X: %.2f, Max X: %.2f, Offset X: %.2f\n", magMinX, magMaxX, magOffsetX);
-  Serial.printf("  Min Y: %.2f, Max Y: %.2f, Offset Y: %.2f\n", magMinY, magMaxY, magOffsetY);
-  Serial.printf("  Min Z: %.2f, Max Z: %.2f, Offset Z: %.2f\n", magMinZ, magMaxZ, magOffsetZ);
+  // Reset mask so UI knows calibration is done
+  calPointsMask = 0;
+
+  Serial.println("4-point calibration complete!");
+  Serial.printf("  Offset: %.2f, %.2f, %.2f\n", magOffsetX, magOffsetY, magOffsetZ);
+  Serial.printf("  Scale:  %.3f, %.3f\n", magScaleX, magScaleY);
 }
 
 // Process incoming GPS data (I2C)

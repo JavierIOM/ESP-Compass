@@ -246,70 +246,87 @@
         }
 
         /* Calibration */
-        .calibration-panel {
-            display: flex;
-            gap: 0.75rem;
+        .cal-panel {
+            border: 1px dashed #1a3a1a;
+            padding: 1rem;
             width: 100%;
         }
 
-        .btn-cal {
+        .cal-panel .panel-header {
+            font-size: 0.7rem;
+            color: #00cc33;
+            opacity: 0.7;
+            border-bottom: 1px solid #1a3a1a;
+            padding-bottom: 0.4rem;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.15em;
+        }
+
+        .cal-instructions {
+            font-size: 0.7rem;
+            color: #00cc33;
+            opacity: 0.6;
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .cal-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .btn-cardinal {
             flex: 1;
             background: transparent;
-            border: 1px solid #00ff41;
-            color: #00ff41;
+            border: 1px solid #1a3a1a;
+            color: #00cc33;
             font-family: "Courier New", Consolas, monospace;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             font-weight: bold;
-            padding: 0.65rem 1rem;
+            padding: 0.6rem 0;
             cursor: pointer;
             letter-spacing: 0.1em;
             transition: all 0.2s;
+            text-align: center;
         }
 
-        .btn-cal:hover {
-            background: rgba(0,255,65,0.1);
+        .btn-cardinal:hover {
+            border-color: #00ff41;
+            color: #00ff41;
             text-shadow: 0 0 8px #00ff41;
         }
 
-        .btn-cal:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .btn-cal.secondary {
-            border-color: #1a3a1a;
-            color: #00cc33;
-        }
-
-        .btn-cal.secondary:hover {
-            border-color: #00cc33;
-        }
-
-        .calibration-status {
-            text-align: center;
-            padding: 0.75rem;
-            border: 1px dashed #1a3a1a;
-            width: 100%;
-            display: none;
-        }
-
-        .calibration-status.active { display: block; }
-
-        .calibration-status .countdown {
-            font-size: 2rem;
-            font-weight: bold;
-            margin: 0.3rem 0;
-        }
-
-        .calibration-status .instructions {
-            font-size: 0.75rem;
-            color: #00cc33;
-            opacity: 0.7;
-        }
-
-        .calibration-complete {
+        .btn-cardinal.captured {
+            border-color: #00ff41;
             color: #00ff41;
-            font-weight: bold;
+            background: rgba(0,255,65,0.1);
+            text-shadow: 0 0 10px #00ff41;
+        }
+
+        .btn-clear {
+            background: transparent;
+            border: 1px solid #1a3a1a;
+            color: #00cc33;
+            font-family: "Courier New", Consolas, monospace;
+            font-size: 0.7rem;
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            letter-spacing: 0.1em;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-clear:hover {
+            border-color: #ff3333;
+            color: #ff3333;
+        }
+
+        .cal-status {
+            text-align: center;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            min-height: 1.2em;
         }
 
         /* Map container */
@@ -538,15 +555,18 @@
             </div>
         </div>
 
-        <!-- Calibration -->
-        <div class="calibration-panel">
-            <button class="btn-cal" id="calibrateBtn" onclick="startCalibration()">[CALIBRATE]</button>
-            <button class="btn-cal secondary" id="clearCalBtn" onclick="clearCalibration()">[CLEAR CAL]</button>
-        </div>
-        <div class="calibration-status" id="calibrationStatus">
-            <div class="instructions">ROTATE COMPASS SLOWLY IN ALL DIRECTIONS</div>
-            <div class="countdown glow-bright" id="countdown">15</div>
-            <div class="instructions">SECONDS REMAINING</div>
+        <!-- 4-Point Calibration -->
+        <div class="cal-panel">
+            <div class="panel-header">// CALIBRATION</div>
+            <div class="cal-instructions">POINT COMPASS TO EACH DIRECTION AND CAPTURE</div>
+            <div class="cal-buttons">
+                <button class="btn-cardinal" id="calN" onclick="capturePoint('N')">[N]</button>
+                <button class="btn-cardinal" id="calE" onclick="capturePoint('E')">[E]</button>
+                <button class="btn-cardinal" id="calS" onclick="capturePoint('S')">[S]</button>
+                <button class="btn-cardinal" id="calW" onclick="capturePoint('W')">[W]</button>
+            </div>
+            <button class="btn-clear" onclick="clearCalibration()">[CLEAR CALIBRATION]</button>
+            <div class="cal-status glow" id="calStatus"></div>
         </div>
     </main>
 
@@ -603,10 +623,12 @@
         const magX = document.getElementById('magX');
         const magY = document.getElementById('magY');
         const magZ = document.getElementById('magZ');
-        const calibrateBtn = document.getElementById('calibrateBtn');
-        const clearCalBtn = document.getElementById('clearCalBtn');
-        const calibrationStatus = document.getElementById('calibrationStatus');
-        const countdown = document.getElementById('countdown');
+        const calBtnN = document.getElementById('calN');
+        const calBtnE = document.getElementById('calE');
+        const calBtnS = document.getElementById('calS');
+        const calBtnW = document.getElementById('calW');
+        const calStatus = document.getElementById('calStatus');
+        const calBtns = { N: calBtnN, E: calBtnE, S: calBtnS, W: calBtnW };
         const envPanel = document.getElementById('envPanel');
         const temperature = document.getElementById('temperature');
         const humidity = document.getElementById('humidity');
@@ -631,8 +653,7 @@
         let lastMapLat = null;
         let lastMapLon = null;
 
-        let isCalibrating = false;
-        let wasCalibrating = false;
+        let prevCalMask = -1;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -753,35 +774,24 @@
                 }
             }
 
-            // Calibration UI
-            isCalibrating = data.calibrating === true;
-            if (isCalibrating) {
-                calibrateBtn.disabled = true;
-                calibrateBtn.textContent = '[CALIBRATING...]';
-                clearCalBtn.disabled = true;
-                calibrationStatus.classList.add('active');
-                const countdownEl = document.getElementById('countdown');
-                if (countdownEl && data.calRemaining !== undefined) {
-                    countdownEl.textContent = data.calRemaining;
-                }
-                wasCalibrating = true;
-            } else {
-                calibrateBtn.disabled = false;
-                calibrateBtn.textContent = '[CALIBRATE]';
-                clearCalBtn.disabled = false;
+            // Calibration UI - update button states from bitmask
+            if (data.cal !== undefined && data.cal !== prevCalMask) {
+                const mask = data.cal;
+                calBtnN.classList.toggle('captured', !!(mask & 1));
+                calBtnE.classList.toggle('captured', !!(mask & 2));
+                calBtnS.classList.toggle('captured', !!(mask & 4));
+                calBtnW.classList.toggle('captured', !!(mask & 8));
 
-                if (wasCalibrating) {
-                    calibrationStatus.innerHTML = '<div class="calibration-complete glow-bright">CALIBRATION COMPLETE</div>';
+                // Show completion message when mask goes from 15 back to 0
+                if (prevCalMask === 15 && mask === 0) {
+                    calStatus.textContent = 'CALIBRATION COMPLETE';
+                    calStatus.classList.add('glow-bright');
                     setTimeout(() => {
-                        calibrationStatus.classList.remove('active');
-                        calibrationStatus.innerHTML = `
-                            <div class="instructions">ROTATE COMPASS SLOWLY IN ALL DIRECTIONS</div>
-                            <div class="countdown glow-bright" id="countdown">15</div>
-                            <div class="instructions">SECONDS REMAINING</div>
-                        `;
-                    }, 2000);
-                    wasCalibrating = false;
+                        calStatus.textContent = '';
+                        calStatus.classList.remove('glow-bright');
+                    }, 3000);
                 }
+                prevCalMask = mask;
             }
         }
 
@@ -797,15 +807,21 @@
             }
         }
 
-        function startCalibration() {
+        function capturePoint(dir) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({cmd: 'startCal'}));
+                ws.send(JSON.stringify({cmd: 'cal' + dir}));
             }
         }
 
         function clearCalibration() {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({cmd: 'clearCal'}));
+                calBtnN.classList.remove('captured');
+                calBtnE.classList.remove('captured');
+                calBtnS.classList.remove('captured');
+                calBtnW.classList.remove('captured');
+                calStatus.textContent = 'CALIBRATION CLEARED';
+                setTimeout(() => { calStatus.textContent = ''; }, 2000);
             }
         }
 
