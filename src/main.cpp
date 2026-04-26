@@ -95,10 +95,19 @@ float latestRawMagZ = 0.0;
 char jsonBuffer[512];
 
 // Smoothing filter for heading
-#define SMOOTHING_SAMPLES 5
+#define SMOOTHING_SAMPLES 10
 float headingHistory[SMOOTHING_SAMPLES];
 int headingIndex = 0;
 bool headingBufferFilled = false;
+
+// EMA filter for sensor inputs — reduces noise before it hits the tilt compensation trig
+#define EMA_ALPHA 0.2f
+float emaAccX = 0.0f, emaAccY = 0.0f, emaAccZ = 0.0f;
+float emaMagX = 0.0f, emaMagY = 0.0f, emaMagZ = 0.0f;
+bool emaInit = false;
+
+// Whether valid calibration data is loaded
+bool calibrationValid = false;
 
 // Forward declarations
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -247,12 +256,25 @@ void loop() {
     float mag_y = (raw_mag_y - magOffsetY) * magScaleY;
     float mag_z = raw_mag_z - magOffsetZ;
 
-    // Calculate heading with tilt compensation
+    // EMA filter — smooth sensor inputs before tilt compensation to reduce noise
+    if (!emaInit) {
+      emaAccX = accel_event.acceleration.x;
+      emaAccY = accel_event.acceleration.y;
+      emaAccZ = accel_event.acceleration.z;
+      emaMagX = mag_x; emaMagY = mag_y; emaMagZ = mag_z;
+      emaInit = true;
+    }
+    emaAccX += EMA_ALPHA * (accel_event.acceleration.x - emaAccX);
+    emaAccY += EMA_ALPHA * (accel_event.acceleration.y - emaAccY);
+    emaAccZ += EMA_ALPHA * (accel_event.acceleration.z - emaAccZ);
+    emaMagX += EMA_ALPHA * (mag_x - emaMagX);
+    emaMagY += EMA_ALPHA * (mag_y - emaMagY);
+    emaMagZ += EMA_ALPHA * (mag_z - emaMagZ);
+
+    // Calculate heading with tilt compensation using filtered sensor values
     float heading = calculateTiltCompensatedHeading(
-      accel_event.acceleration.x,
-      accel_event.acceleration.y,
-      accel_event.acceleration.z,
-      mag_x, mag_y, mag_z
+      emaAccX, emaAccY, emaAccZ,
+      emaMagX, emaMagY, emaMagZ
     );
 
     // Convert to degrees (0-360)
@@ -294,9 +316,9 @@ void loop() {
 
     // Build JSON with all available data
     int len = snprintf(jsonBuffer, sizeof(jsonBuffer),
-      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"cal\":%d",
+      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"cal\":%d,\"calibrated\":%d",
       heading, direction.c_str(), mag_x, mag_y, mag_z,
-      calPointsMask);
+      calPointsMask, (int)calibrationValid);
 
     // Add environmental data if available
     if (bmeAvailable) {
@@ -349,26 +371,13 @@ float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, fl
   if (ax > 1.0) ax = 1.0;
   if (ax < -1.0) ax = -1.0;
 
-  // Calculate pitch
+  // Calculate pitch and roll
+  // atan2(ay, az) for roll is stable across full ±180° range with no gimbal lock
   float pitch = asin(-ax);
-
-  // Calculate roll with gimbal lock protection
-  float cos_pitch = cos(pitch);
-  float roll;
-
-  // Protect against division by zero near gimbal lock (pitch near +/-90 degrees)
-  if (fabs(cos_pitch) < 0.01) {
-    // Near gimbal lock - use simplified calculation
-    roll = 0.0;
-  } else {
-    // Clamp ay/cos(pitch) to valid range for asin
-    float roll_arg = ay / cos_pitch;
-    if (roll_arg > 1.0) roll_arg = 1.0;
-    if (roll_arg < -1.0) roll_arg = -1.0;
-    roll = asin(roll_arg);
-  }
+  float roll = atan2(ay, az);
 
   // Tilt compensated magnetic field components
+  float cos_pitch = cos(pitch);
   float cos_roll = cos(roll);
   float sin_roll = sin(roll);
   float sin_pitch = sin(pitch);
@@ -467,6 +476,7 @@ void loadCalibration() {
     if (isnan(magScaleY) || isinf(magScaleY) || magScaleY < 0.1 || magScaleY > 10.0) valid = false;
 
     if (valid) {
+      calibrationValid = true;
       Serial.println("Calibration loaded from EEPROM:");
       Serial.printf("  Offset: %.2f, %.2f, %.2f\n", magOffsetX, magOffsetY, magOffsetZ);
       Serial.printf("  Scale:  %.3f, %.3f\n", magScaleX, magScaleY);
@@ -481,6 +491,7 @@ void loadCalibration() {
     EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
     EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
     magScaleX = 1.0; magScaleY = 1.0;
+    calibrationValid = true;
     Serial.println("Old calibration format loaded (offsets only)");
   } else {
     Serial.println("No calibration data found in EEPROM");
@@ -499,6 +510,7 @@ void saveCalibration() {
   EEPROM.put(EEPROM_SCALE_X_ADDR, magScaleX);
   EEPROM.put(EEPROM_SCALE_Y_ADDR, magScaleY);
   EEPROM.commit();
+  calibrationValid = true;
   Serial.println("Calibration saved to EEPROM");
 }
 

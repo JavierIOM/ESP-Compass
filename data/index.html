@@ -329,6 +329,22 @@
             min-height: 1.2em;
         }
 
+        .cal-warning {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #ff4444;
+            text-shadow: 0 0 8px #ff4444;
+            border: 1px solid #ff4444;
+            padding: 0.4rem;
+            margin-bottom: 0.75rem;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
         /* Map container */
         .map-container {
             border: 1px solid #1a3a1a;
@@ -557,6 +573,7 @@
 
         <!-- 4-Point Calibration -->
         <div class="cal-panel">
+            <div id="calWarning" class="cal-warning" style="display:none;">!! UNCALIBRATED -- READINGS INVALID !!</div>
             <div class="panel-header">// CALIBRATION</div>
             <div class="cal-instructions">POINT COMPASS TO EACH DIRECTION AND CAPTURE</div>
             <div class="cal-buttons">
@@ -772,6 +789,11 @@
                     gpsVdop.textContent = '---';
                     gpsPdop.textContent = '---';
                 }
+            }
+
+            // Show/hide uncalibrated warning
+            if (data.calibrated !== undefined) {
+                document.getElementById('calWarning').style.display = data.calibrated ? 'none' : 'block';
             }
 
             // Calibration UI - update button states from bitmask
