@@ -270,38 +270,45 @@
             margin-bottom: 0.75rem;
         }
 
-        .cal-buttons {
-            display: flex;
-            gap: 0.5rem;
+        .btn-start-cal {
+            width: 100%;
+            background: transparent;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            font-family: "Courier New", Consolas, monospace;
+            font-size: 0.85rem;
+            font-weight: bold;
+            padding: 0.65rem 0;
+            cursor: pointer;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 8px #00ff41;
+            transition: all 0.2s;
             margin-bottom: 0.75rem;
         }
 
-        .btn-cardinal {
-            flex: 1;
-            background: transparent;
-            border: 1px solid #1a3a1a;
+        .btn-start-cal:hover { background: rgba(0,255,65,0.08); }
+        .btn-start-cal:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .cal-progress-bar {
+            height: 6px;
+            background: #1a3a1a;
+            margin-bottom: 0.4rem;
+        }
+
+        .cal-progress-fill {
+            height: 100%;
+            background: #00ff41;
+            box-shadow: 0 0 8px #00ff41;
+            width: 0%;
+            transition: width 0.2s;
+        }
+
+        .cal-progress-label {
+            font-size: 0.65rem;
             color: #00cc33;
-            font-family: "Courier New", Consolas, monospace;
-            font-size: 0.9rem;
-            font-weight: bold;
-            padding: 0.6rem 0;
-            cursor: pointer;
-            letter-spacing: 0.1em;
-            transition: all 0.2s;
+            opacity: 0.6;
             text-align: center;
-        }
-
-        .btn-cardinal:hover {
-            border-color: #00ff41;
-            color: #00ff41;
-            text-shadow: 0 0 8px #00ff41;
-        }
-
-        .btn-cardinal.captured {
-            border-color: #00ff41;
-            color: #00ff41;
-            background: rgba(0,255,65,0.1);
-            text-shadow: 0 0 10px #00ff41;
+            margin-bottom: 0.75rem;
         }
 
         .btn-clear {
@@ -317,10 +324,7 @@
             width: 100%;
         }
 
-        .btn-clear:hover {
-            border-color: #ff3333;
-            color: #ff3333;
-        }
+        .btn-clear:hover { border-color: #ff3333; color: #ff3333; }
 
         .cal-status {
             text-align: center;
@@ -571,16 +575,15 @@
             </div>
         </div>
 
-        <!-- 4-Point Calibration -->
+        <!-- Spin Calibration -->
         <div class="cal-panel">
             <div id="calWarning" class="cal-warning" style="display:none;">!! UNCALIBRATED -- READINGS INVALID !!</div>
             <div class="panel-header">// CALIBRATION</div>
-            <div class="cal-instructions">POINT COMPASS TO EACH DIRECTION AND CAPTURE</div>
-            <div class="cal-buttons">
-                <button class="btn-cardinal" id="calN" onclick="capturePoint('N')">[N]</button>
-                <button class="btn-cardinal" id="calE" onclick="capturePoint('E')">[E]</button>
-                <button class="btn-cardinal" id="calS" onclick="capturePoint('S')">[S]</button>
-                <button class="btn-cardinal" id="calW" onclick="capturePoint('W')">[W]</button>
+            <div class="cal-instructions" id="calInstructions">POINT NORTH, PRESS START, SPIN 360°</div>
+            <button class="btn-start-cal" id="calStartBtn" onclick="startCalibration()">[START CALIBRATION]</button>
+            <div id="calProgressWrap" style="display:none;">
+                <div class="cal-progress-bar"><div class="cal-progress-fill" id="calProgressFill"></div></div>
+                <div class="cal-progress-label" id="calProgressLabel">0%</div>
             </div>
             <button class="btn-clear" onclick="clearCalibration()">[CLEAR CALIBRATION]</button>
             <div class="cal-status glow" id="calStatus"></div>
@@ -640,12 +643,13 @@
         const magX = document.getElementById('magX');
         const magY = document.getElementById('magY');
         const magZ = document.getElementById('magZ');
-        const calBtnN = document.getElementById('calN');
-        const calBtnE = document.getElementById('calE');
-        const calBtnS = document.getElementById('calS');
-        const calBtnW = document.getElementById('calW');
         const calStatus = document.getElementById('calStatus');
-        const calBtns = { N: calBtnN, E: calBtnE, S: calBtnS, W: calBtnW };
+        const calStartBtn = document.getElementById('calStartBtn');
+        const calProgressWrap = document.getElementById('calProgressWrap');
+        const calProgressFill = document.getElementById('calProgressFill');
+        const calProgressLabel = document.getElementById('calProgressLabel');
+        const calInstructions = document.getElementById('calInstructions');
+        let isCalibrating = false;
         const envPanel = document.getElementById('envPanel');
         const temperature = document.getElementById('temperature');
         const humidity = document.getElementById('humidity');
@@ -670,7 +674,7 @@
         let lastMapLat = null;
         let lastMapLon = null;
 
-        let prevCalMask = -1;
+        let prevCalState = -1;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -796,24 +800,35 @@
                 document.getElementById('calWarning').style.display = data.calibrated ? 'none' : 'block';
             }
 
-            // Calibration UI - update button states from bitmask
-            if (data.cal !== undefined && data.cal !== prevCalMask) {
-                const mask = data.cal;
-                calBtnN.classList.toggle('captured', !!(mask & 1));
-                calBtnE.classList.toggle('captured', !!(mask & 2));
-                calBtnS.classList.toggle('captured', !!(mask & 4));
-                calBtnW.classList.toggle('captured', !!(mask & 8));
-
-                // Show completion message when mask goes from 15 back to 0
-                if (prevCalMask === 15 && mask === 0) {
-                    calStatus.textContent = 'CALIBRATION COMPLETE';
-                    calStatus.classList.add('glow-bright');
-                    setTimeout(() => {
-                        calStatus.textContent = '';
-                        calStatus.classList.remove('glow-bright');
-                    }, 3000);
+            // Spin calibration UI
+            if (data.cal_state !== undefined) {
+                const spinning = data.cal_state === 1;
+                if (spinning !== isCalibrating) {
+                    isCalibrating = spinning;
+                    if (spinning) {
+                        calStartBtn.textContent = '[CALIBRATING...]';
+                        calStartBtn.disabled = true;
+                        calInstructions.textContent = 'KEEP SPINNING SLOWLY...';
+                        calProgressWrap.style.display = 'block';
+                    } else if (prevCalState === 1) {
+                        // Just finished
+                        calStartBtn.textContent = '[START CALIBRATION]';
+                        calStartBtn.disabled = false;
+                        calInstructions.textContent = 'POINT NORTH, PRESS START, SPIN 360°';
+                        calProgressWrap.style.display = 'none';
+                        calProgressFill.style.width = '0%';
+                        calProgressLabel.textContent = '0%';
+                        calStatus.textContent = 'CALIBRATION COMPLETE';
+                        calStatus.classList.add('glow-bright');
+                        setTimeout(() => { calStatus.textContent = ''; calStatus.classList.remove('glow-bright'); }, 4000);
+                    }
                 }
-                prevCalMask = mask;
+                prevCalState = data.cal_state;
+            }
+            if (data.cal_progress !== undefined && isCalibrating) {
+                const pct = data.cal_progress + '%';
+                calProgressFill.style.width = pct;
+                calProgressLabel.textContent = pct;
             }
         }
 
@@ -829,20 +844,9 @@
             }
         }
 
-        function capturePoint(dir) {
-            const btn = calBtns[dir];
+        function startCalibration() {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({cmd: 'cal' + dir}));
-                console.log('Sent cal' + dir);
-                // Immediate visual feedback (flash)
-                btn.style.background = 'rgba(0,255,65,0.3)';
-                btn.style.color = '#00ff41';
-                setTimeout(() => {
-                    if (!btn.classList.contains('captured')) {
-                        btn.style.background = '';
-                        btn.style.color = '';
-                    }
-                }, 500);
+                ws.send(JSON.stringify({cmd: 'calStart'}));
             } else {
                 calStatus.textContent = 'NOT CONNECTED';
                 setTimeout(() => { calStatus.textContent = ''; }, 2000);
@@ -852,10 +856,11 @@
         function clearCalibration() {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({cmd: 'clearCal'}));
-                calBtnN.classList.remove('captured');
-                calBtnE.classList.remove('captured');
-                calBtnS.classList.remove('captured');
-                calBtnW.classList.remove('captured');
+                isCalibrating = false;
+                calStartBtn.textContent = '[START CALIBRATION]';
+                calStartBtn.disabled = false;
+                calProgressWrap.style.display = 'none';
+                calInstructions.textContent = 'POINT NORTH, PRESS START, SPIN 360°';
                 calStatus.textContent = 'CALIBRATION CLEARED';
                 setTimeout(() => { calStatus.textContent = ''; }, 2000);
             }
