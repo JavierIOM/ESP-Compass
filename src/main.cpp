@@ -92,6 +92,7 @@ float calNorthRawX, calNorthRawY, calNorthRawZ; // Raw mag captured at north ref
 float calNorthAccX, calNorthAccY, calNorthAccZ; // Accel captured at north reference (for tilt compensation)
 bool calSectors[36];                // 36 sectors × 10° = full circle
 int calSectorsVisited = 0;
+bool calGateCleared = false;        // true once both axes have enough spread for a reliable centre
 
 // Latest raw magnetometer reading (updated every loop tick)
 float latestRawMagX = 0.0;
@@ -556,6 +557,7 @@ void startSpinCalibration() {
   calMinY = calMaxY = latestRawMagY;
   memset(calSectors, 0, sizeof(calSectors));
   calSectorsVisited = 0;
+  calGateCleared = false;
   Serial.println("Spin calibration started — spin 360° slowly");
 }
 
@@ -569,11 +571,19 @@ void updateSpinCalibration() {
   if (latestRawMagY < calMinY) calMinY = latestRawMagY;
   if (latestRawMagY > calMaxY) calMaxY = latestRawMagY;
 
-  // Don't mark sectors until there's enough spread to trust the centre estimate.
-  // Without this gate, atan2(~0, ~0) from sensor noise covers all sectors instantly.
+  // Wait until both axes have enough spread for a reliable centre estimate.
+  // Requiring both (not just one) means ~30-45° of actual rotation has occurred.
+  // At that point, reset the sector map so any garbage sectors from the early
+  // bad-centre period are discarded and counting starts clean.
   float rangeX = calMaxX - calMinX;
   float rangeY = calMaxY - calMinY;
-  if (rangeX < 5.0f && rangeY < 5.0f) return;
+  if (rangeX < 10.0f || rangeY < 10.0f) return;
+  if (!calGateCleared) {
+    calGateCleared = true;
+    memset(calSectors, 0, sizeof(calSectors));
+    calSectorsVisited = 0;
+    Serial.println("Cal gate cleared — centre stable, sector counting started");
+  }
 
   // Use center-relative angle — without this, a large hard-iron offset collapses
   // all raw readings into a narrow arc so the sector counter never advances past ~5
