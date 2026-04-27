@@ -1,30 +1,26 @@
 # ESP32 Digital Compass
 
-**Version 1.0.1**
+**Version 2.0.0**
 
-> **Note:** The OLED display and GPS module features have been implemented but not yet hardware tested. The core compass functionality (LSM303AGR, BME280, calibration) is fully tested and working.
-
-A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer sensor. Optional support for BME280 (temperature/humidity/pressure), OLED display, and GPS module. The ESP32 creates its own WiFi access point, perfect for field use. Access your compass from any device with a beautiful, real-time web interface.
+A remote-accessible digital compass built with ESP32 and the Adafruit LSM303AGR accelerometer/magnetometer. Optional support for BME280 (temperature/humidity/pressure), OLED display, and GPS. The ESP32 creates its own WiFi access point — perfect for field use. Access your compass from any device with a real-time web interface.
 
 ## Features
 
-- Real-time compass heading with tilt compensation
+- Real-time tilt-compensated compass heading
 - 16-point cardinal direction display (N, NNE, NE, etc.)
+- One-button spin calibration with hard-iron offset, soft-iron scale, and north alignment
+- EMA-filtered sensor inputs for stable readings
+- 10-sample circular mean heading smoothing
+- Blinking UNCALIBRATED warning when no valid calibration is stored
 - Live magnetometer readings (X, Y, Z axes)
-- **Optional BME280 sensor** for temperature, humidity, and pressure
-- **Optional 0.96" OLED display** showing heading, direction, grid square, temperature, and WiFi info
+- **Optional BME280** for temperature, humidity, and pressure
+- **Optional 0.96" OLED display** showing heading, direction, grid square, temperature, WiFi info
 - **Optional GPS module** for location and Maidenhead grid square calculation
 - WebSocket-based real-time updates (10Hz)
-- Responsive web interface with animated compass needle
+- CRT/radar terminal aesthetic — green on black
 - Dark/Light mode toggle (dark mode default)
 - Works on any device with a web browser
-- Ultra-low power consumption with battery support
-- Access Point mode - no existing WiFi network required (perfect for field use)
-- All optional sensors auto-detected - code works with any combination
-
-## Screenshot
-
-![ESP32 Digital Compass Web Interface](docs/screenshot.png)
+- Access Point mode — no existing WiFi network required
 
 ## Hardware Requirements
 
@@ -54,25 +50,17 @@ All parts available from **The Pi Hut** (UK):
 - **Low Power:** Ultra-low power consumption design, perfect for battery operation
 - **Built-in LiPo Support:** Battery connector with onboard charging circuit
 - **Compact Design:** Smaller than standard ESP32 DevKit boards
-- **Quality Components:** DFRobot quality, more reliable than generic clones
 - **I2C Ready:** GPIO21 (SDA) and GPIO22 (SCL) match our code perfectly
 
 ### About the Cable
 
 **IMPORTANT:** The LSM303AGR uses **STEMMA QT** connectors (JST-SH, 1mm pitch).
-- ✅ Use: STEMMA QT / Qwiic / JST-SH cables
-- ❌ Don't use: STEMMA (JST-PH, 2mm pitch) - won't fit!
-
-The recommended cable has:
-- JST-SH female connector (plugs into sensor)
-- Male jumper wires (plug into FireBeetle headers)
-- 150mm length (perfect for this project)
+- Use: STEMMA QT / Qwiic / JST-SH cables
+- Don't use: STEMMA (JST-PH, 2mm pitch) — won't fit
 
 ## Wiring
 
-### Complete System Diagram
-
-All components connect to the FireBeetle ESP32 via I2C. STEMMA QT / Qwiic cables make wiring simple - no soldering required for most connections.
+All components connect to the FireBeetle ESP32 via I2C. STEMMA QT / Qwiic cables make wiring simple — no soldering required.
 
 ```
      ┌─────────────────┐      ┌─────────────────┐
@@ -97,76 +85,49 @@ All components connect to the FireBeetle ESP32 via I2C. STEMMA QT / Qwiic cables
                                    │         │
      ┌─────────────────────────────▼─────────▼───┐
      │           FireBeetle ESP32                │
-     │                                           │
-     │  I2C Bus (shared by all devices):         │
-     │  GPIO21 (SDA)                             │
-     │  GPIO22 (SCL)                             │
-     │                                           │
+     │  I2C Bus: GPIO21 (SDA), GPIO22 (SCL)      │
      │  Power: 3.3V and GND to all devices       │
      └───────────────────────────────────────────┘
 ```
 
-### Required: LSM303AGR Compass (No Soldering!)
+### LSM303AGR Compass (required)
 
-The LSM303AGR connects using a STEMMA QT to male header cable:
+| Cable Wire | FireBeetle Pin |
+|------------|----------------|
+| Black | GND |
+| Red | 3.3V |
+| Blue | GPIO 21 (SDA) |
+| Yellow | GPIO 22 (SCL) |
 
-| Cable Wire | FireBeetle Pin | Notes |
-|------------|----------------|-------|
-| Black | GND | Ground |
-| Red | 3.3V or V | Power |
-| Blue | GPIO 21 (SDA) | I2C Data |
-| Yellow | GPIO 22 (SCL) | I2C Clock |
+### BME280, OLED, GPS (optional)
 
-### Optional: BME280 Environmental Sensor
+All daisy-chain on the same I2C bus via STEMMA QT cables. No extra wiring to the ESP32.
 
-Daisy-chain to LSM303AGR using a STEMMA QT cable - the LSM303AGR has two ports. Same I2C bus, no extra wiring to ESP32.
+## Software Setup
 
-### Optional: OLED Display
+### PlatformIO (Recommended)
 
-| OLED Pin | FireBeetle Pin |
-|----------|----------------|
-| VCC | 3.3V |
-| GND | GND |
-| SDA | GPIO 21 |
-| SCL | GPIO 22 |
+1. Install [VS Code](https://code.visualstudio.com/) and the PlatformIO IDE extension
+2. Open this project folder — PlatformIO auto-detects `platformio.ini`
+3. Wait for libraries to download (first time only)
 
-**Display shows:** heading, direction, grid square, temperature, WiFi info
+#### Build and Upload
 
-### Optional: GPS Module
+```
+# Firmware
+pio run -t upload
 
-Uses Adafruit Mini GPS PA1010D with STEMMA QT (I2C). Daisy-chain to the LSM303AGR or BME280 using a STEMMA QT cable - same I2C bus, no extra wiring to ESP32.
+# Web files (SPIFFS)
+pio run -t uploadfs
+```
 
-**GPS provides:** location, altitude, speed, satellites, Maidenhead grid square
+Both must be uploaded. Either order is fine.
 
-## Software Requirements
+#### USB Drivers
 
-### PlatformIO Setup (Recommended)
-
-This project uses PlatformIO for building and uploading.
-
-#### 1. Install VS Code and PlatformIO
-
-1. Download and install [VS Code](https://code.visualstudio.com/)
-2. Open VS Code
-3. Go to Extensions (Ctrl+Shift+X)
-4. Search for "PlatformIO IDE"
-5. Install the PlatformIO IDE extension
-6. Restart VS Code when prompted
-
-#### 2. Open the Project
-
-1. Open VS Code
-2. Click "Open Folder" and select this project folder
-3. PlatformIO will automatically detect `platformio.ini` and configure the project
-4. Wait for PlatformIO to download required libraries (first time only)
-
-#### 3. USB Drivers (Usually Automatic)
-
-Windows 10/11 usually installs drivers automatically when you plug in the FireBeetle.
-
-If the board isn't recognized:
-- **CP2102 Driver:** https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers
-- **CH340 Driver:** https://sparks.gogo.co.nz/ch340.html
+Windows 10/11 usually installs drivers automatically. If not:
+- CH340: https://sparks.gogo.co.nz/ch340.html
+- CP2102: https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers
 
 ## Project Structure
 
@@ -174,7 +135,7 @@ If the board isn't recognized:
 ESP-Compass/
 ├── platformio.ini          # PlatformIO configuration
 ├── src/
-│   └── main.cpp            # Main application code
+│   └── main.cpp            # Firmware
 ├── data/
 │   └── index.html          # Web interface (uploaded to SPIFFS)
 ├── case/
@@ -182,394 +143,193 @@ ESP-Compass/
 └── README.md
 ```
 
-## 3D Printable Case
-
-A custom 3D printable case is included in the `case/` folder.
-
-**Features:**
-- Mounting standoffs for FireBeetle ESP32 (M3 screws)
-- Mounting standoffs for LSM303AGR sensor (M2.5 screws)
-- Flat Li-Po battery compartment (65x36x10mm, 3000mAh)
-- Separate platform piece for easy assembly
-- USB port cutout
-- 5mm perspex/acrylic lid with DXF cutting template
-
-**Print Settings:**
-- Layer height: 0.2mm
-- Infill: 20%
-- Supports: Not required
-- Material: PLA or PETG
-
-**Files:**
-- `compass_case.scad` - OpenSCAD source (parametric, customizable)
-- `lid_template.dxf` - DXF file for laser cutting the perspex lid
-- STL files available in releases
-
-**Hardware needed for case:**
-- 4x M3 screws (6-8mm) for FireBeetle
-- 4x M2.5 screws (6-8mm) for LSM303AGR
-- 1x 3000mAh flat Li-Po battery (65x36x10mm)
-- 1x 5mm clear perspex/acrylic sheet (78x62mm with 4mm corner radius)
-
-## Installation
-
-### 1. Configure Access Point (Optional)
-
-The ESP32 creates its own WiFi network. You can customize the name and password by editing `src/main.cpp` lines 22-24:
-
-```cpp
-const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
-const char* ap_password = "compass123";     // Password (min 8 chars, or "" for open network)
-```
-
-**Default settings work great for most users!**
-
-### 2. Build the Project
-
-In VS Code with PlatformIO:
-
-1. Click the PlatformIO icon in the sidebar (alien head icon)
-2. Under "Project Tasks" → "firebeetle32":
-   - Click **Build** to compile the project
-
-Or use the keyboard shortcut: `Ctrl+Alt+B`
-
-### 3. Upload the Web Interface (SPIFFS)
-
-The web files must be uploaded separately to the ESP32's filesystem:
-
-1. Connect the FireBeetle ESP32 via USB
-2. In PlatformIO sidebar, click **Upload Filesystem Image**
-   - This uploads everything in the `data/` folder to SPIFFS
-
-**Important:** Do this BEFORE or AFTER uploading the main firmware - both are required!
-
-### 4. Upload the Firmware
-
-1. In PlatformIO sidebar, click **Upload**
-2. Wait for compilation and upload to complete
-3. The serial monitor will show upload progress
-
-Or use the keyboard shortcut: `Ctrl+Alt+U`
-
-### 5. Connect to the Compass
-
-After uploading, the ESP32 creates its own WiFi network:
-
-1. Open Serial Monitor (PlatformIO sidebar → Monitor, or `Ctrl+Alt+S`)
-2. Press the **RST** button on the ESP32
-3. You'll see:
-   ```
-   ESP32 Digital Compass
-   =====================
-   LSM303AGR sensors initialized successfully!
-   Starting Access Point...
-   Access Point Started!
-   AP SSID: ESP32-Compass
-   AP Password: compass123
-   IP Address: 192.168.4.1
-   Web server started!
-   Connect to WiFi network: ESP32-Compass
-   Then visit: http://192.168.4.1
-   ```
-
-4. On your phone/tablet/laptop:
-   - Open WiFi settings
-   - Connect to network: **ESP32-Compass**
-   - Enter password: **compass123**
-   - Wait for connection
-
-5. Open any web browser and navigate to: **http://192.168.4.1**
-
-The compass interface will load immediately!
-
 ## Usage
 
 ### First Use
 
-1. Power on the ESP32 (via USB or battery)
-2. Wait ~5 seconds for the Access Point to start
-3. Connect your device to the **ESP32-Compass** WiFi network
-4. Open your browser to **http://192.168.4.1**
-5. The compass needle should start moving immediately
-6. Rotate the sensor to test - the needle follows magnetic north
-
-**Perfect for field use:** The ESP32 works anywhere, no internet or existing WiFi needed!
+1. Power on the ESP32 (USB or battery)
+2. Connect your device to the **ESP32-Compass** WiFi (password: `compass123`)
+3. Open **http://192.168.4.1** in a browser
+4. If no calibration has been saved, a blinking red **UNCALIBRATED** warning will show — calibrate before trusting the heading
 
 ### Calibration
 
-The compass includes an automatic calibration feature for accurate readings.
+The compass uses a one-button spin calibration that computes hard-iron offset, soft-iron scale, and north alignment in a single pass.
 
-**Calibration Procedure:**
+**Procedure:**
 
-1. Open the compass web interface at **http://192.168.4.1**
-2. Click the **"Calibrate"** button
-3. During the 15-second countdown:
-   - Slowly rotate the sensor in all directions
-   - Complete 360° horizontal rotation
-   - Tilt up and down
-   - Roll side to side
-   - Figure-8 pattern works well
-4. Calibration completes automatically
-5. Offsets are saved to EEPROM and persist across reboots
+1. Take the device outside away from metal objects
+2. Hold it level
+3. Point it at magnetic north (use your phone compass if unsure)
+4. Press **Start Calibration** in the web UI
+5. Slowly rotate the device through a full 360° horizontal spin
+6. The progress bar advances as you cover new sectors — it auto-completes at ~89% coverage
+7. Calibration is saved to EEPROM and persists across reboots
 
-**Clear Calibration:**
-- Click the **"Clear Calibration"** button to reset offsets to zero
+**Tips:**
+- Keep it level throughout — tilt during the spin doesn't matter much, but try to hold level when pressing Start (that's when north is captured)
+- Slow is better than fast
+- Avoid phones, speakers, and power supplies nearby (30cm+ clearance)
+
+**Clear Calibration:** Press **Clear Calibration** to wipe EEPROM and force recalibration on next boot.
 
 ### Tips for Best Results
 
-- **Level mounting:** Keep sensor relatively level (within ±30°)
-- **Avoid interference:** Keep 30cm+ away from:
-  - Speakers/magnets
-  - Motors
-  - Large metal objects
-  - Phones/laptops
-  - Power supplies
-- **Stable mounting:** Secure the sensor to avoid vibration
+- Keep the sensor 30cm+ away from speakers, motors, phones, laptops, and power supplies
+- Recalibrate if you change environment (e.g., move from indoors to outdoors)
+- The OLED display shows the current heading even without a browser connection
 
 ### Battery Operation
 
-The FireBeetle ESP32 has excellent battery support:
+- LiPo connector: JST 2.0mm on board
+- Onboard LiPo charging via USB
+- Typical battery life: 8-12 hours with 1000mAh
 
-- **LiPo Connector:** JST 2.0mm connector on board
-- **Charging:** Onboard LiPo charging via USB
-- **Battery Life:** 8-12 hours typical with 1000mAh battery
+## 3D Printable Case
 
-## Web Interface Features
+A custom case is in the `case/` folder.
 
-### Compass Display
-- **Animated compass rose** with 45 degree marks
-- **Cardinal directions** (N, E, S, W) highlighted in red
-- **Red needle** points to magnetic north
-- **Smooth rotation** with CSS transitions
-- **Responsive design** - works on phone, tablet, desktop
+- Mounting standoffs for FireBeetle ESP32 (M3) and LSM303AGR (M2.5)
+- Flat Li-Po battery compartment (65x36x10mm, 3000mAh)
+- USB port cutout
+- 5mm perspex/acrylic lid with DXF cutting template
 
-### Data Panel
-- **Large heading display** - current cardinal direction
-- **Numeric heading** - degrees (0-360°)
-- **Magnetometer data** - X, Y, Z axes in µT (microtesla)
-- **Real-time updates** - 10 times per second
+**Print settings:** 0.2mm layer height, 20% infill, no supports, PLA or PETG.
 
-### Theme Toggle
-- **Dark mode** (default) - easy on the eyes
-- **Light mode** - for bright environments
+## WebSocket Data Format
 
-### Connection Status
-- **Green pulsing dot** - Connected to ESP32
-- **Red pulsing dot** - Disconnected (auto-reconnects)
+JSON sent at 10Hz over `/ws`:
+
+```json
+{
+  "heading": 245.3,
+  "direction": "WSW",
+  "mag_x": 23.45,
+  "mag_y": -12.34,
+  "mag_z": 45.67,
+  "cal_state": 0,
+  "cal_progress": 0,
+  "calibrated": 1,
+  "temperature": 22.5,
+  "humidity": 45.2,
+  "pressure": 1013.25,
+  "gps_has_fix": true,
+  "gps_lat": 54.1234,
+  "gps_lon": -4.5678,
+  "gps_sats": 8,
+  "gps_alt": 125.5,
+  "gps_speed": 0.0,
+  "grid_square": "IO74re"
+}
+```
+
+- `cal_state`: 0 = idle, 1 = spinning
+- `cal_progress`: 0–100% coverage of the 360° spin
+- `calibrated`: 1 = valid calibration loaded, 0 = uncalibrated
+- Environmental and GPS fields only present when those sensors are connected
 
 ## Troubleshooting
 
-### Hardware Issues
+**"Could not find LSM303AGR"** — check all 4 wire connections; verify cable is STEMMA QT not STEMMA
 
-**"Could not find LSM303AGR" Error**
-- Check all 4 wire connections (GND, VIN, SDA, SCL)
-- Verify sensor power - look for a small LED on the sensor board
-- Ensure cable is fully inserted into STEMMA QT port
-- Try the other STEMMA QT port on the sensor
+**Heading is wrong** — run calibration; avoid nearby magnets/metal
 
-**Compass Points Wrong Direction**
-- Perform calibration procedure (see Usage section)
-- Check for magnetic interference nearby
+**UNCALIBRATED warning showing** — press Start Calibration and do a slow 360° spin
 
-### Software Issues
+**Calibration stuck at low %** — you may have magnetic interference nearby; move outside and retry
 
-**Can't See ESP32-Compass WiFi Network**
-- Wait 10 seconds after powering on
-- Check Serial Monitor - does it say "Access Point Started!"?
-- Press the RST button on the ESP32
+**Can't see ESP32-Compass WiFi** — wait 10 seconds after power-on; press RST if needed
 
-**Web Page Won't Load**
-- Ensure you're connected to the **ESP32-Compass** WiFi network
-- Try the default IP: **http://192.168.4.1**
-- Verify SPIFFS upload was successful
+**Page won't load** — confirm you're on the ESP32-Compass network; verify SPIFFS was uploaded
 
-**Page Loads But Shows "Disconnected"**
-- Check Serial Monitor - is the ESP32 still running?
-- Try refreshing the page
-
-### Upload Issues
-
-**"Failed to connect to ESP32"**
-- Check USB cable (some are power-only, need data cable)
-- Try a different USB port
-- Press and hold BOOT button while uploading
+**Upload fails** — check it's a data cable not a charge-only cable; try BOOT button during upload
 
 ## Technical Details
 
-### Hardware Specifications
+**FireBeetle ESP32:** ESP-WROOM-32, dual-core Xtensa LX6, 240MHz, 802.11 b/g/n WiFi, LiPo charging
 
-**FireBeetle ESP32:**
-- Microcontroller: ESP-WROOM-32 (Dual-core Xtensa LX6)
-- Clock Speed: Up to 240MHz
-- WiFi: 802.11 b/g/n (2.4GHz)
-- Power: Ultra-low consumption design, LiPo charging circuit
+**LSM303AGR:** ±2/4/8/16g accelerometer, ±50 gauss magnetometer, 16-bit, I2C 0x19/0x1E
 
-**Adafruit LSM303AGR:**
-- Accelerometer Range: ±2g / ±4g / ±8g / ±16g (selectable)
-- Magnetometer Range: ±50 gauss
-- Resolution: 16-bit
-- I2C Addresses: 0x19 (accelerometer), 0x1E (magnetometer)
-
-### Communication Protocol
-
-- WebSocket connection on port 80
-- JSON data format:
-  ```json
-  {
-    "heading": 245.3,
-    "direction": "WSW",
-    "mag_x": 23.45,
-    "mag_y": -12.34,
-    "mag_z": 45.67,
-    "calibrating": false,
-    "calRemaining": 0,
-    "temperature": 22.5,
-    "humidity": 45.2,
-    "pressure": 1013.25,
-    "gps_has_fix": true,
-    "gps_lat": 54.1234,
-    "gps_lon": -4.5678,
-    "gps_sats": 8,
-    "gps_alt": 125.5,
-    "gps_speed": 0.0,
-    "grid_square": "IO74re"
-  }
-  ```
-- Environmental data (temperature, humidity, pressure) only included when BME280 is connected
-- GPS data (gps_*, grid_square) only included when GPS module is connected and has valid fix
-- Update frequency: 10Hz (100ms intervals)
-
-## Customization
-
-### Change Update Rate
-
-In `src/main.cpp`, line 68:
-```cpp
-const unsigned long updateInterval = 100; // milliseconds
-
-// Examples:
-// 50ms = 20Hz (very smooth, more power)
-// 100ms = 10Hz (current setting, balanced)
-// 200ms = 5Hz (slower, saves power)
-```
-
-### Modify Compass Appearance
-
-Edit `data/index.html` CSS variables to customize colors and styling.
-
-## Version History
-
-- **v1.0.1** (January 2025) - **Hardware Tested with GPS**
-  - Switched GPS from Serial UART to I2C (Adafruit Mini GPS PA1010D via STEMMA QT)
-  - Fixed false OLED detection when display not connected
-  - Removed verbose serial debug output
-  - Improved JavaScript robustness (null checks, coordinate validation, countdown fix)
-  - GPS panel now shows fix status ("3D", "2D", "No Fix") dynamically
-  - Updated README with accurate wiring diagram and JSON documentation
-
-- **v1.0.0** (January 2025) - **First Stable Release**
-  - Promoted to v1.0.0 stable release
-  - Core features fully tested: compass heading, calibration, BME280 environmental data
-  - Optional OLED and GPS features implemented but awaiting hardware testing
-
-- **v0.0.6** (January 2025)
-  - **New Features:**
-    - Optional 0.96" OLED display support (SSD1306, I2C)
-    - Optional GPS module support (Serial, NMEA)
-    - Automatic Maidenhead grid square calculation from GPS coordinates
-    - Display shows: heading, direction, grid square, temperature, WiFi info
-    - GPS data included in WebSocket JSON when available
-    - All optional hardware auto-detected at startup
-  - **Technical Details:**
-    - TinyGPS++ library for GPS parsing
-    - Adafruit SSD1306 library for OLED
-    - GPS on I2C (Adafruit Mini GPS PA1010D at 0x10)
-    - Display updates at 4Hz to reduce flicker
-
-- **v0.0.5** (January 2025) - **Hardware Tested**
-  - **New Features:**
-    - Optional BME280 sensor support for temperature, humidity, and pressure
-    - Sensor auto-detection - works with or without BME280 connected
-    - Environmental data panel in web UI (only shown when sensor present)
-  - **Case Design:**
-    - Redesigned case for flat 65x36x10mm Li-Po battery (3000mAh)
-    - Separate platform piece for easier assembly
-    - 5mm perspex/acrylic lid option with DXF cutting template
-
-- **v0.0.4** (January 2025) - **Hardware Tested**
-  - **Bug Fixes:**
-    - Fixed compass needle rotating in wrong direction (inverted heading)
-  - **Improvements:**
-    - Added 5-sample moving average filter for smoother heading display
-    - Uses circular mean algorithm to handle 0°/360° wraparound correctly
-
-- **v0.0.3** (January 2025) - **Hardware Tested**
-  - **New Features:**
-    - Added automatic magnetometer calibration via web interface
-    - Calibration button with 15-second countdown timer
-    - Clear calibration button to reset offsets
-    - Calibration data saved to EEPROM (persists across reboots)
-    - Real-time calibration status display in web UI
-  - **Technical Details:**
-    - Hard-iron calibration using min/max method
-    - EEPROM storage with magic number validation
-    - WebSocket commands for calibration control
-  - **Status:** Successfully tested on hardware
-
-- **v0.0.2** (January 2025)
-  - **Bug Fixes:**
-    - Fixed critical division-by-zero in tilt compensation when device is tilted near vertical
-    - Fixed gimbal lock handling when pitch approaches ±90 degrees
-    - Fixed potential NaN values from asin() with out-of-range inputs
-    - Fixed potential negative array index in cardinal direction lookup
-    - Fixed SPIFFS mount failure now properly halts execution with error message
-  - **Improvements:**
-    - Replaced String concatenation with pre-allocated buffer to prevent heap fragmentation
-    - Added JSON parse error handling in web interface
-    - Removed redundant AsyncWebSocket include
-    - Added bounds checking throughout compass calculations
-
-- **v0.0.1** (January 2025)
-  - Initial PlatformIO setup
-  - Migrated from Arduino IDE to PlatformIO
-  - Tilt-compensated heading calculation
-  - WebSocket real-time updates
-  - Dark/Light mode interface
-  - FireBeetle ESP32 support
-  - STEMMA QT connector support
+**Heading pipeline:**
+1. Raw accel + mag read at 10Hz
+2. EMA filter (α=0.2) on both axes
+3. Pitch = `asin(-ax)`, Roll = `atan2(ay, az)`
+4. Tilt-compensated mag components
+5. `atan2` for heading
+6. Hard-iron offset and soft-iron scale applied
+7. 10-sample circular mean smoothing
+8. North heading offset applied
 
 ## Dependencies
 
-Managed automatically by PlatformIO (see `platformio.ini`):
+Managed automatically by PlatformIO:
 
 - Adafruit Unified Sensor
 - Adafruit LSM303 Accel
 - Adafruit LIS2MDL
 - Adafruit BME280 Library
-- Adafruit SSD1306
-- Adafruit GFX Library
+- Adafruit SSD1306 + GFX Library
 - Adafruit GPS Library
-- AsyncTCP (me-no-dev)
-- ESPAsyncWebServer (me-no-dev)
+- AsyncTCP
+- ESPAsyncWebServer
+
+## Version History
+
+- **v2.0.0** (April 2026) — **Accuracy Overhaul + Spin Calibration**
+  - Replaced 4-point N/E/S/W calibration with one-button 360° spin calibration
+  - Spin calibration now computes hard-iron offset, soft-iron scale, AND north heading alignment
+  - Fixed roll calculation: `asin(ay/cos_pitch)` → `atan2(ay, az)` — stable across ±180°, no gimbal lock
+  - Added EMA filter (α=0.2) on raw accel + mag before tilt compensation
+  - Increased heading smoothing from 5 to 10 samples
+  - Added blinking UNCALIBRATED warning in UI
+  - Fixed sector tracking using centre-relative angle (large hard-iron offsets no longer prevent calibration completing)
+  - Fixed minimum range gate — noise no longer instantly fills all sectors at spin start
+  - Fixed north offset captured with tilt-compensated formula (not flat-plane)
+  - Fixed clearCal not persisting — now writes invalid EEPROM magic so reboot correctly shows UNCALIBRATED
+  - Fixed needle 360° wrap-around spin using cumulative rotation with shortest-path delta
+  - EEPROM magic bumped to `0xCAF4` (backward-compatible with `0xCAF2`, `0xCAFE`)
+
+- **v1.0.1** (January 2025) — **Hardware Tested with GPS**
+  - Switched GPS from Serial UART to I2C (Adafruit Mini GPS PA1010D via STEMMA QT)
+  - Fixed false OLED detection when display not connected
+  - Improved JavaScript robustness
+
+- **v1.0.0** (January 2025) — **First Stable Release**
+  - Core features fully tested: compass heading, calibration, BME280 environmental data
+
+- **v0.0.6** (January 2025)
+  - Optional OLED display and GPS module support
+  - Maidenhead grid square calculation
+
+- **v0.0.5** (January 2025)
+  - Optional BME280 environmental sensor
+  - Redesigned 3D printed case
+
+- **v0.0.4** (January 2025)
+  - Fixed compass needle rotating wrong direction
+  - 5-sample circular mean filter
+
+- **v0.0.3** (January 2025)
+  - Magnetometer calibration via web interface
+  - EEPROM storage
+
+- **v0.0.2** (January 2025)
+  - Fixed tilt compensation division-by-zero
+  - Pre-allocated JSON buffer
+
+- **v0.0.1** (January 2025)
+  - Initial PlatformIO setup, WebSocket, dark/light mode
 
 ## License
 
-This project is open source. Feel free to modify, distribute, and use for any purpose.
+Open source. Free to modify, distribute, and use for any purpose.
 
 ## Credits
 
-**Hardware:**
-- ESP32 by Espressif Systems
-- LSM303AGR sensor by STMicroelectronics
-- FireBeetle board by DFRobot
-- Breakout board by Adafruit Industries
+Hardware: Espressif (ESP32), STMicroelectronics (LSM303AGR), DFRobot (FireBeetle), Adafruit (breakout boards)
 
-**Software Libraries:**
-- Adafruit Sensor Libraries
-- ESPAsyncWebServer by me-no-dev
-- AsyncTCP by me-no-dev
+Software: Adafruit sensor libraries, ESPAsyncWebServer/AsyncTCP
 
 ---
 
-Built with ESP32 and Adafruit LSM303AGR sensor | January 2025
+Built with ESP32 and Adafruit LSM303AGR | April 2026
