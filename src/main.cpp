@@ -567,6 +567,12 @@ void updateSpinCalibration() {
   if (latestRawMagY < calMinY) calMinY = latestRawMagY;
   if (latestRawMagY > calMaxY) calMaxY = latestRawMagY;
 
+  // Don't mark sectors until there's enough spread to trust the centre estimate.
+  // Without this gate, atan2(~0, ~0) from sensor noise covers all sectors instantly.
+  float rangeX = calMaxX - calMinX;
+  float rangeY = calMaxY - calMinY;
+  if (rangeX < 5.0f && rangeY < 5.0f) return;
+
   // Use center-relative angle — without this, a large hard-iron offset collapses
   // all raw readings into a narrow arc so the sector counter never advances past ~5
   float centerX = (calMaxX + calMinX) / 2.0f;
