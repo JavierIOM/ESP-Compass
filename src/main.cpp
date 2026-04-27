@@ -88,7 +88,8 @@ float headingOffset = 0.0; // Corrects heading so north = 0°
 enum CalState { CAL_IDLE, CAL_SPINNING };
 CalState calState = CAL_IDLE;
 float calMinX, calMaxX, calMinY, calMaxY;
-float calNorthRawX, calNorthRawY;   // Raw mag captured at north reference
+float calNorthRawX, calNorthRawY, calNorthRawZ; // Raw mag captured at north reference
+float calNorthAccX, calNorthAccY, calNorthAccZ; // Accel captured at north reference (for tilt compensation)
 bool calSectors[36];                // 36 sectors × 10° = full circle
 int calSectorsVisited = 0;
 
@@ -456,7 +457,10 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         magScaleX = 1.0; magScaleY = 1.0;
         headingOffset = 0.0;
         calibrationValid = false;
-        saveCalibration();
+        // Write an invalid magic so EEPROM doesn't reload as "calibrated" on next boot
+        uint16_t inv = 0xFFFF;
+        EEPROM.put(EEPROM_MAGIC_ADDR, inv);
+        EEPROM.commit();
         Serial.println("Calibration cleared");
       }
     }
@@ -496,17 +500,25 @@ void loadCalibration() {
       magScaleX = 1; magScaleY = 1; headingOffset = 0;
     }
   } else if (magic == CALIBRATION_MAGIC_V3 || magic == CALIBRATION_MAGIC_OLD) {
+    bool valid = false;
     if (magic == CALIBRATION_MAGIC_V3) {
-      loadBase();
+      valid = loadBase();
     } else {
       EEPROM.get(EEPROM_OFFSET_X_ADDR, magOffsetX);
       EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
       EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
       magScaleX = 1.0; magScaleY = 1.0;
+      valid = !(isnan(magOffsetX) || isnan(magOffsetY) || isnan(magOffsetZ));
     }
-    headingOffset = 0.0;
-    calibrationValid = true;
-    Serial.println("Old calibration format loaded (no north offset — recalibrate for best accuracy)");
+    if (valid) {
+      headingOffset = 0.0;
+      calibrationValid = true;
+      Serial.println("Old calibration format loaded (no north offset — recalibrate for best accuracy)");
+    } else {
+      Serial.println("Old EEPROM calibration invalid - resetting");
+      magOffsetX = 0; magOffsetY = 0; magOffsetZ = 0;
+      magScaleX = 1; magScaleY = 1; headingOffset = 0;
+    }
   } else {
     Serial.println("No calibration data in EEPROM");
     magOffsetX = 0; magOffsetY = 0; magOffsetZ = 0;
@@ -529,11 +541,15 @@ void saveCalibration() {
   Serial.println("Calibration saved to EEPROM");
 }
 
-// Begin spin calibration — call when user presses the button pointing north
+// Begin spin calibration — call when user presses the button pointing north (device must be level)
 void startSpinCalibration() {
   calState = CAL_SPINNING;
   calNorthRawX = latestRawMagX;
   calNorthRawY = latestRawMagY;
+  calNorthRawZ = latestRawMagZ;
+  calNorthAccX = emaAccX;
+  calNorthAccY = emaAccY;
+  calNorthAccZ = emaAccZ;
   calMinX = calMaxX = latestRawMagX;
   calMinY = calMaxY = latestRawMagY;
   memset(calSectors, 0, sizeof(calSectors));
@@ -551,10 +567,13 @@ void updateSpinCalibration() {
   if (latestRawMagY < calMinY) calMinY = latestRawMagY;
   if (latestRawMagY > calMaxY) calMaxY = latestRawMagY;
 
-  // Mark which 10° sector the raw field is pointing at
-  float angle = atan2(latestRawMagY, latestRawMagX) * 180.0 / PI;
-  if (angle < 0) angle += 360.0;
-  int sector = (int)(angle / 10.0) % 36;
+  // Use center-relative angle — without this, a large hard-iron offset collapses
+  // all raw readings into a narrow arc so the sector counter never advances past ~5
+  float centerX = (calMaxX + calMinX) / 2.0f;
+  float centerY = (calMaxY + calMinY) / 2.0f;
+  float angle = atan2(latestRawMagY - centerY, latestRawMagX - centerX) * 180.0f / PI;
+  if (angle < 0) angle += 360.0f;
+  int sector = (int)(angle / 10.0f) % 36;
   if (!calSectors[sector]) {
     calSectors[sector] = true;
     calSectorsVisited++;
@@ -580,11 +599,16 @@ void computeSpinCalibration() {
   magScaleX = (rangeX > 0.1) ? avgRange / rangeX : 1.0;
   magScaleY = (rangeY > 0.1) ? avgRange / rangeY : 1.0;
 
-  // North offset: figure out what heading the corrected north reference gives,
-  // then store the opposite so it reads 0° when pointing north
+  // North offset: compute tilt-compensated heading for the saved north reference,
+  // then store the negative so it reads 0° when pointing north.
+  // Uses the accel captured at button press so tilt at that moment is accounted for.
   float corrNx = (calNorthRawX - magOffsetX) * magScaleX;
   float corrNy = (calNorthRawY - magOffsetY) * magScaleY;
-  float northHeading = -atan2(corrNy, corrNx) * 180.0 / PI;
+  float corrNz = calNorthRawZ - magOffsetZ;
+  float northHeading = calculateTiltCompensatedHeading(
+    calNorthAccX, calNorthAccY, calNorthAccZ,
+    corrNx, corrNy, corrNz
+  ) * 180.0 / PI;
   if (northHeading < 0) northHeading += 360.0;
   headingOffset = -northHeading;
 
