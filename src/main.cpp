@@ -99,7 +99,7 @@ float latestRawMagY = 0.0;
 float latestRawMagZ = 0.0;
 
 // Pre-allocated buffer for JSON to reduce heap fragmentation
-char jsonBuffer[512];
+char jsonBuffer[768];
 
 // Smoothing filter for heading
 #define SMOOTHING_SAMPLES 10
@@ -392,14 +392,14 @@ float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, fl
   float pitch = asin(-ax);
   float roll = atan2(ay, az);
 
-  // Tilt compensated magnetic field components
+  // Tilt compensated magnetic field components (full 3-axis rotation matrix, Freescale AN4248)
   float cos_pitch = cos(pitch);
   float cos_roll = cos(roll);
   float sin_roll = sin(roll);
   float sin_pitch = sin(pitch);
 
-  float mag_x_comp = mx * cos_pitch + mz * sin_pitch;
-  float mag_y_comp = mx * sin_roll * sin_pitch + my * cos_roll - mz * sin_roll * cos_pitch;
+  float mag_x_comp = mx * cos_pitch + my * sin_roll * sin_pitch + mz * cos_roll * sin_pitch;
+  float mag_y_comp = my * cos_roll - mz * sin_roll;
 
   // Calculate heading (negated to correct for sensor orientation)
   float heading = -atan2(mag_y_comp, mag_x_comp);
@@ -508,7 +508,9 @@ void loadCalibration() {
       EEPROM.get(EEPROM_OFFSET_Y_ADDR, magOffsetY);
       EEPROM.get(EEPROM_OFFSET_Z_ADDR, magOffsetZ);
       magScaleX = 1.0; magScaleY = 1.0;
-      valid = !(isnan(magOffsetX) || isnan(magOffsetY) || isnan(magOffsetZ));
+      valid = !(isnan(magOffsetX) || isinf(magOffsetX) || fabs(magOffsetX) > 500.0 ||
+               isnan(magOffsetY) || isinf(magOffsetY) || fabs(magOffsetY) > 500.0 ||
+               isnan(magOffsetZ) || isinf(magOffsetZ) || fabs(magOffsetZ) > 500.0);
     }
     if (valid) {
       headingOffset = 0.0;
