@@ -405,7 +405,7 @@
             <span class="status-indicator" id="status"></span>
             ESP32-COMPASS
         </span>
-        <span id="statusText" class="glow">SYS: ONLINE // v1.0.1</span>
+        <span id="statusText" class="glow">SYS: ONLINE // v2.1.0</span>
     </div>
 
     <main>
@@ -587,11 +587,25 @@
             </div>
             <button class="btn-clear" onclick="clearCalibration()">[CLEAR CALIBRATION]</button>
             <div class="cal-status glow" id="calStatus"></div>
+
+            <!-- Manual trim -->
+            <div style="margin-top: 0.75rem; border-top: 1px solid #1a3a1a; padding-top: 0.75rem;">
+                <div class="panel-header" style="border: none; padding: 0; margin-bottom: 0.5rem;">// HEADING TRIM</div>
+                <div style="text-align: center; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                    TRIM: <span id="trimValue" class="glow">+0.0°</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                    <button class="btn-terminal" onclick="adjustTrim(-5)">[-5°]</button>
+                    <button class="btn-terminal" onclick="adjustTrim(-1)">[-1°]</button>
+                    <button class="btn-terminal" onclick="adjustTrim(1)">[+1°]</button>
+                    <button class="btn-terminal" onclick="adjustTrim(5)">[+5°]</button>
+                </div>
+            </div>
         </div>
     </main>
 
     <footer>
-        ESP32 DIGITAL COMPASS // LSM303AGR // v1.0.1 // <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">GITHUB</a>
+        ESP32 DIGITAL COMPASS // LSM303AGR // v2.1.0 // <a href="https://github.com/JavierIOM/ESP-Compass" target="_blank">GITHUB</a>
     </footer>
 
     <script>
@@ -676,6 +690,7 @@
         let lastMapLon = null;
 
         let prevCalState = -1;
+        let currentTrim = 0;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -686,7 +701,7 @@
             ws.onopen = () => {
                 console.log('WebSocket connected');
                 status.classList.remove('disconnected');
-                statusText.textContent = 'SYS: ONLINE // v1.0.1';
+                statusText.textContent = 'SYS: ONLINE // v2.1.0';
                 direction.textContent = 'CONNECTED';
             };
 
@@ -707,7 +722,7 @@
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
                 status.classList.add('disconnected');
-                statusText.textContent = 'SYS: OFFLINE // v1.0.1';
+                statusText.textContent = 'SYS: OFFLINE // v2.1.0';
                 direction.textContent = 'DISCONNECTED';
                 setTimeout(connectWebSocket, 3000);
             };
@@ -800,6 +815,12 @@
                 }
             }
 
+            // Sync trim display from firmware
+            if (data.trim_offset !== undefined) {
+                currentTrim = data.trim_offset;
+                document.getElementById('trimValue').textContent = (currentTrim >= 0 ? '+' : '') + currentTrim.toFixed(1) + '°';
+            }
+
             // Show/hide uncalibrated warning
             if (data.calibrated !== undefined) {
                 document.getElementById('calWarning').style.display = data.calibrated ? 'none' : 'block';
@@ -867,7 +888,17 @@
                 calProgressWrap.style.display = 'none';
                 calInstructions.textContent = 'POINT NORTH, PRESS START, SPIN 360°';
                 calStatus.textContent = 'CALIBRATION CLEARED';
+                currentTrim = 0;
+                document.getElementById('trimValue').textContent = '+0.0°';
                 setTimeout(() => { calStatus.textContent = ''; }, 2000);
+            }
+        }
+
+        function adjustTrim(delta) {
+            currentTrim = Math.max(-45, Math.min(45, currentTrim + delta));
+            document.getElementById('trimValue').textContent = (currentTrim >= 0 ? '+' : '') + currentTrim.toFixed(1) + '°';
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({cmd: 'trimSet', value: currentTrim}));
             }
         }
 
