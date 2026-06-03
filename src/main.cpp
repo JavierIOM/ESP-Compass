@@ -23,6 +23,7 @@
 #define EEPROM_SCALE_X_ADDR 14
 #define EEPROM_SCALE_Y_ADDR 18
 #define EEPROM_HEADING_OFFSET_ADDR 22
+#define EEPROM_TRIM_OFFSET_ADDR 26
 
 // Access Point credentials - CHANGE THESE IF DESIRED
 const char* ap_ssid = "ESP32-Compass";     // The WiFi network name
@@ -83,6 +84,7 @@ float magOffsetZ = 0.0;
 float magScaleX = 1.0;
 float magScaleY = 1.0;
 float headingOffset = 0.0; // Corrects heading so north = 0°
+float trimOffset = 0.0;    // Manual fine-tune, persisted in EEPROM
 
 // Spin calibration state
 enum CalState { CAL_IDLE, CAL_SPINNING };
@@ -124,6 +126,7 @@ float calculateTiltCompensatedHeading(float ax, float ay, float az, float mx, fl
 String getCardinalDirection(float heading);
 void loadCalibration();
 void saveCalibration();
+void saveTrim();
 void startSpinCalibration();
 void updateSpinCalibration();
 void computeSpinCalibration();
@@ -313,8 +316,8 @@ void loop() {
       if (heading < 0) heading += 360.0;
     }
 
-    // Apply north offset so calibrated north = 0°
-    heading += headingOffset;
+    // Apply north offset so calibrated north = 0°, then manual trim
+    heading += headingOffset + trimOffset;
     if (heading < 0) heading += 360.0;
     if (heading >= 360.0) heading -= 360.0;
 
@@ -333,9 +336,9 @@ void loop() {
 
     // Build JSON with all available data
     int len = snprintf(jsonBuffer, sizeof(jsonBuffer),
-      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"cal_state\":%d,\"cal_progress\":%d,\"calibrated\":%d",
+      "{\"heading\":%.1f,\"direction\":\"%s\",\"mag_x\":%.2f,\"mag_y\":%.2f,\"mag_z\":%.2f,\"cal_state\":%d,\"cal_progress\":%d,\"calibrated\":%d,\"trim_offset\":%.1f",
       heading, direction.c_str(), mag_x, mag_y, mag_z,
-      (int)calState, (calSectorsVisited * 100 / 36), (int)calibrationValid);
+      (int)calState, (calSectorsVisited * 100 / 36), (int)calibrationValid, trimOffset);
 
     // Add environmental data if available
     if (bmeAvailable) {
@@ -457,12 +460,24 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         magOffsetX = 0.0; magOffsetY = 0.0; magOffsetZ = 0.0;
         magScaleX = 1.0; magScaleY = 1.0;
         headingOffset = 0.0;
+        trimOffset = 0.0;
         calibrationValid = false;
         // Write an invalid magic so EEPROM doesn't reload as "calibrated" on next boot
         uint16_t inv = 0xFFFF;
         EEPROM.put(EEPROM_MAGIC_ADDR, inv);
+        EEPROM.put(EEPROM_TRIM_OFFSET_ADDR, trimOffset);
         EEPROM.commit();
         Serial.println("Calibration cleared");
+      } else if (msg.indexOf("trimSet") >= 0) {
+        int idx = msg.indexOf("\"value\":");
+        if (idx >= 0) {
+          float val = msg.substring(idx + 8).toFloat();
+          if (!isnan(val) && !isinf(val)) {
+            trimOffset = constrain(val, -45.0f, 45.0f);
+            saveTrim();
+            Serial.printf("Trim offset set to %.1f°\n", trimOffset);
+          }
+        }
       }
     }
   }
@@ -527,6 +542,16 @@ void loadCalibration() {
     magOffsetX = 0; magOffsetY = 0; magOffsetZ = 0;
     magScaleX = 1; magScaleY = 1; headingOffset = 0;
   }
+
+  // Load trim offset independently — valid even if calibration is absent
+  float savedTrim;
+  EEPROM.get(EEPROM_TRIM_OFFSET_ADDR, savedTrim);
+  if (isnan(savedTrim) || isinf(savedTrim) || fabs(savedTrim) > 90.0) {
+    trimOffset = 0.0;
+  } else {
+    trimOffset = savedTrim;
+  }
+  if (trimOffset != 0.0) Serial.printf("Trim offset loaded: %.1f°\n", trimOffset);
 }
 
 // Save calibration to EEPROM
@@ -542,6 +567,12 @@ void saveCalibration() {
   EEPROM.commit();
   calibrationValid = true;
   Serial.println("Calibration saved to EEPROM");
+}
+
+// Persist trim offset without touching calibration data
+void saveTrim() {
+  EEPROM.put(EEPROM_TRIM_OFFSET_ADDR, trimOffset);
+  EEPROM.commit();
 }
 
 // Begin spin calibration — call when user presses the button pointing north (device must be level)
